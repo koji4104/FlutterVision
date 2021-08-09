@@ -12,7 +12,8 @@ String Size2Str(Size s) {
 }
 
 class CameraScreen extends StatefulWidget {
-  CameraScreen({Key key}) : super(key: key);
+  //CameraScreen({Key? key}) : super(key: key);
+  CameraScreen();
   @override
   CameraScreenState createState() => CameraScreenState();
 }
@@ -27,9 +28,9 @@ class CameraScreenState extends State<CameraScreen> {
   bool isAndroid = Platform.isAndroid;
 
   bool _loading = false;
-  VisionAdapter _vision;
-  CameraController _controller = null;
-  List<CameraDescription> _cameras;
+  VisionAdapter? _vision;
+  CameraController? _controller;
+  List<CameraDescription> _cameras = [];
   Size _cameraSize = Size(100.0, 100.0);
   Size _screenSize = Size(100.0, 100.0);
   double _scale = 1.0;
@@ -45,8 +46,11 @@ class CameraScreenState extends State<CameraScreen> {
   Future<void> _initCameraSync() async {
     _cameras = await availableCameras();
     if (_cameras.length > 0) {
-      _controller = CameraController(_cameras[0], _resolutionPreset);
-      _controller.initialize().then((_) {
+      _controller = CameraController(
+          _cameras[0],
+          _resolutionPreset,
+          imageFormatGroup: ImageFormatGroup.yuv420);
+      _controller!.initialize().then((_) {
         if (!mounted)
           return;
         setState(() {});
@@ -56,8 +60,8 @@ class CameraScreenState extends State<CameraScreen> {
 
   @override
   void dispose() {
-    if (_controller != null) _controller?.dispose();
-    if (_vision != null) _vision.dispose();
+    if (_controller != null) _controller!.dispose();
+    if (_vision != null) _vision!.dispose();
     super.dispose();
   }
 
@@ -76,9 +80,9 @@ class CameraScreenState extends State<CameraScreen> {
               child: AspectRatio(
                 aspectRatio: 9.0/16.0,
                 child: CustomPaint(
-                    size: _cameraSize,
-                    painter: VisionPainter(_vision, _cameraSize, _screenSize)
-                    ),),),
+                  size: _cameraSize,
+                  painter: VisionPainter(_vision!, _cameraSize, _screenSize)
+                ),),),
           ),
 
           // Detect button
@@ -110,30 +114,53 @@ class CameraScreenState extends State<CameraScreen> {
           ),
 
           _typeButton(
+            Icon(Icons.face),
+            VisionType.FACE,
             top: 30, left: 30+70.0*0,
-            icon: Icon(Icons.face),
-            type: VisionType.FACE,
           ),
           _typeButton(
+            Icon(Icons.face_unlock_outlined),
+            VisionType.FACE2,
             top: 30, left: 30+70.0*1,
-            icon: Icon(Icons.face_unlock_outlined),
-            type: VisionType.FACE2,
           ),
           _typeButton(
+            Icon(Icons.font_download_outlined),
+            VisionType.TEXT,
             top: 30, left: 30+70.0*2,
-            icon: Icon(Icons.font_download_outlined),
-            type: VisionType.TEXT,
           ),
           _typeButton(
+            Icon(Icons.image),
+            VisionType.IMAGE,
             top: 30, left: 30+70.0*3,
-            icon: Icon(Icons.image),
-            type: VisionType.IMAGE,
           ),
           _typeButton(
+            Icon(Icons.qr_code),
+            VisionType.BARCODE,
             top: 30, left: 30+70.0*4,
-            icon: Icon(Icons.qr_code),
-            type: VisionType.BARCODE,
           ),
+
+          _typeButton(
+            Icon(Icons.arrow_upward),
+            VisionType.TENSOR,
+            top: 30.0+70, left: 30+70.0*0,
+          ),
+          _typeButton(
+            Icon(Icons.accessibility),
+            VisionType.POSE,
+            top: 30.0+70, left: 30+70.0*1,
+          ),
+          /*
+          _typeButton(
+            Icon(Icons.clear),
+            VisionType.INK,
+            top: 30.0+70, left: 30+70.0*2,
+          ),   
+          _typeButton(
+            Icon(Icons.clear),
+            VisionType.OBJECT,
+            top: 30.0+70, left: 30+70.0*3,
+          ),
+          */
       ]),
     );
   }
@@ -144,7 +171,8 @@ class CameraScreenState extends State<CameraScreen> {
       return Container();
 
     _screenSize = MediaQuery.of(context).size;
-    _cameraSize = _controller.value.previewSize;
+    _cameraSize = _controller!.value.previewSize!;
+
     _scale = 1.0;
     if(_screenSize.width>_screenSize.height)
       _scale = _screenSize.width/_screenSize.height;
@@ -153,55 +181,72 @@ class CameraScreenState extends State<CameraScreen> {
       _scale*=_screenSize.height/_screenSize.width*16/9;
     else
       _scale*=_screenSize.width/_screenSize.height*16/9;
-    //_scale*=1.1;
+
+    double _camera_scale = 1.0;
+    if(_screenSize.width>_screenSize.height)
+      _camera_scale = _screenSize.height/_screenSize.width*16/9;
+    else
+      _camera_scale = _screenSize.width/_screenSize.height*16/9;
+
+    double aspectRatio = 1.0;
+    if(_screenSize.width>_screenSize.height)
+      aspectRatio = _controller!.value.aspectRatio;
+    else
+      aspectRatio = 1/_controller!.value.aspectRatio;
+
+    if(isTest) {
+      // portrait
+      _scale = 1.1;
+      aspectRatio = 1/_controller!.value.aspectRatio;
+    }
 
     setState(() {});
 
     print('-- screen ' + Size2Str(_screenSize) + ' camera ' + Size2Str(_cameraSize));
-    print('-- aspect ' + _controller.value.aspectRatio.toString() +" scale="+ _scale.toString());
+    print('-- aspect ' + _controller!.value.aspectRatio.toString() +" scale="+ _scale.toString());
 
     return Center(
       child: Transform.scale(
-        scale: _scale,
+        scale: _camera_scale,
         child: OrientationCamera(
           child: AspectRatio(
-            aspectRatio: _controller.value.aspectRatio,
-            child: CameraPreview(_controller),
+            aspectRatio: aspectRatio,
+            child: CameraPreview(_controller!),
           ),),),
     );
   }
 
   /// _onCameraSwitch
   Future<void> _onCameraSwitch() async {
-    final CameraDescription desc = (_controller.description == _cameras[0]) ? _cameras[1] : _cameras[0];
+    final CameraDescription desc = (_controller!.description == _cameras[0]) ? _cameras[1] : _cameras[0];
     if (_controller != null) {
-      await _controller.dispose();
+      await _controller!.dispose();
     }
     _controller = CameraController(desc, _resolutionPreset);
-    _controller.addListener(() {
+    _controller!.addListener(() {
       if (mounted) setState(() {});
     });
     try {
-      await _controller.initialize();
+      await _controller!.initialize();
     } on CameraException catch (e) {
     }
     if (mounted) setState(() {});
   }
 
   /// Button
-  Widget _typeButton({Icon icon, VisionType type,
-    double left=null, double top=null, double right=null, double bottom=null}) {
+  Widget _typeButton(Icon icon, VisionType type, {
+    double? left=null, double? top=null, double? right=null, double? bottom=null}) {
     return Positioned(
       left: left, top:top, right:right, bottom:bottom,
       child: CircleAvatar(
-        backgroundColor: _vision.type==type ? COLOR1 : Colors.black45,
+        backgroundColor: _vision!.type==type ? COLOR1 : Colors.black45,
         radius: ICON_RADIUS,
         child: IconButton(
           icon: icon,
           iconSize: ICON_SIZE,
           color: Colors.white,
           onPressed:() {
-            setState(() { _vision.type = type; });
+            setState(() { _vision!.type = type; });
           }
         ))
     );
@@ -213,18 +258,13 @@ class CameraScreenState extends State<CameraScreen> {
       _loading = true;
     });
     try {
-      if (_controller.value.isInitialized) {
-        final Directory extDir = await getApplicationDocumentsDirectory();
-        final String dirPath = '${extDir.path}/media';
-        await Directory(dirPath).create(recursive: true);
-        final String filePath = '$dirPath/1.jpeg';
-
-        print("-- file=" + filePath);
-
-        if (await File(filePath).exists())
-          File(filePath).deleteSync();
-        await _controller.takePicture(filePath);
-        await _vision.detect(File(filePath));
+      if (_controller!.value.isInitialized) {
+        // /data/user/0/com.example.fluttervision/cache/CAP3945262564019216844.jpg'
+        // /data/user/0/com.example.fluttervision/cache/CAP2341203750827543862.jpg
+        XFile file = await _controller!.takePicture();
+        print('-- path=' + file.path);
+        await _vision!.detect(File(file.path));
+        _deleteCacheDir();
       }
     } on Exception catch (e) {
       print('-- Exception ' + e.toString());
@@ -233,11 +273,18 @@ class CameraScreenState extends State<CameraScreen> {
       _loading = false;
     });
   }
+
+  Future<void> _deleteCacheDir() async {
+    final cacheDir = await getTemporaryDirectory();
+    if (cacheDir.existsSync()) {
+      cacheDir.deleteSync(recursive: true);
+    }
+  }
 }
 
 /// OrientationCamera
 class OrientationCamera extends StatelessWidget {
-  Widget child;
+  Widget? child;
   OrientationCamera({this.child});
   @override
   Widget build(BuildContext context) {
@@ -245,34 +292,13 @@ class OrientationCamera extends StatelessWidget {
         useSensor: true,
         builder: (context) {
           double angle = 0.0;
-          switch(NativeDeviceOrientationReader.orientation(context)) {
-            case NativeDeviceOrientation.landscapeRight: angle=pi*1/2; break;
-            case NativeDeviceOrientation.landscapeLeft: angle=pi*3/2; break;
-            case NativeDeviceOrientation.portraitDown: angle=pi*2/2; break;
-            default: break;
-          }
-          return Transform.rotate(angle: angle, child: child);
-        }
-    );
-  }
-}
-
-/// OrientationWidget (no use)
-class OrientationWidget extends StatelessWidget {
-  Widget child;
-  OrientationWidget({this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return NativeDeviceOrientationReader(
-        useSensor: true,
-        builder: (context) {
-          double angle = 0.0;
-          switch(NativeDeviceOrientationReader.orientation(context)) {
-            case NativeDeviceOrientation.landscapeRight: angle=pi*3/2; break;
-            case NativeDeviceOrientation.landscapeLeft: angle=pi*1/2; break;
-            case NativeDeviceOrientation.portraitDown: angle=pi*2/2; break;
-            default: break;
+          if(isTest) {
+            switch(NativeDeviceOrientationReader.orientation(context)) {
+              case NativeDeviceOrientation.landscapeRight: angle=pi; break;
+              case NativeDeviceOrientation.landscapeLeft: angle=0.0; break;
+              case NativeDeviceOrientation.portraitDown: angle=pi*1/2; break;
+              default: angle = angle=pi*3/2; break;
+            }
           }
           return Transform.rotate(angle: angle, child: child);
         }

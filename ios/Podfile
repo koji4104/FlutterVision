@@ -32,6 +32,12 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # Add ML
+  #pod 'Firebase/MLVisionBarcodeModel'
+  #pod 'Firebase/MLVisionFaceModel'
+  #pod 'Firebase/MLVisionLabelModel'
+  #pod 'Firebase/MLVisionTextModel'
 end
 
 post_install do |installer|
@@ -43,3 +49,4 @@ end
 # Add
 # add pods for desired Firebase products
 # https://firebase.google.com/docs/ios/setup#available-pods
+
