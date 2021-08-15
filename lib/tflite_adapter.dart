@@ -1,18 +1,16 @@
 import 'dart:io';
 import 'package:tflite_flutter/tflite_flutter.dart';
-import 'package:flutter/material.dart';
 import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
-import 'package:image/image.dart' as imagelib;
-import 'dart:math';
 import "dart:async";
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 
 class TfliteAdapter {
   Interpreter? _interpreter = null;
-  List<String> _labels = ['11','22','33','44','55','66','77','88','99','00'];
+  List<String> _labels = [];
   static const double threshold = 0.6;
-  static const int inputSize = 300;
   static const int numResults = 10;
+  int _inputSize = 224;
   ImageProcessor? imageProcessor;
   List<List<int>> _outputShapes = [];
   List<TfLiteType> _outputTypes = [];
@@ -23,11 +21,11 @@ class TfliteAdapter {
 
   bool init=false;
 
-  TensorflowAdapter(){
-  }
+  TensorflowAdapter(){}
 
   Future initModel() async {
     try {
+      _inputSize = 224;
       _interpreter = await Interpreter.fromAsset('model.tflite');
 
       final outputTensors = _interpreter!.getOutputTensors();
@@ -39,83 +37,72 @@ class TfliteAdapter {
       }
 
       outputTensors.asMap().forEach((i, tensor) {
-        TensorBuffer output =
-        TensorBuffer.createFixedSize(tensor.shape, tensor.type);
+        TensorBuffer output = TensorBuffer.createFixedSize(tensor.shape, tensor.type);
         _outputTensorBuffers[i] = output;
         _outputBuffers[i] = output.buffer;
         _outputTensorNames[i] = tensor.name;
       });
 
-      print('-- outputTensors.length=' + outputTensors.length.toString());
+      /// load labels
+      final labelData = await rootBundle.loadString('assets/labels.txt');
+      final labelList = labelData.split('\n');
+      _labels = labelList;
+
       init=true;
     } on Exception catch (e) {
       print('-- initModel '+e.toString());
     }
   }
 
-  Future<List<TfliteResult>> detect(File imagefile) async {
+  Future<List<TfResult>> detect(File imagefile) async {
     if (init == false)
       await new Future.delayed(new Duration(seconds:1));
     if (init == false)
       return [];
 
-    print('-- detect1');
+    List<TfResult> res = [];
+    try {
+      TensorImage inputImage = TensorImage.fromFile(imagefile);
+      inputImage = getProcessedImage(inputImage);
+      final inputs = [inputImage.buffer];
 
-    TensorImage inputImage = TensorImage.fromFile(imagefile);
-    inputImage = getProcessedImage(inputImage);
+      // RUN
+      _interpreter!.runForMultipleInputs(inputs, _outputBuffers);
 
-    print('-- detect2');
-
-    final inputs = [inputImage.buffer];
-    _interpreter!.runForMultipleInputs(inputs, _outputBuffers);
-
-    for (int i = 0; i < _outputTensorBuffers.length; i++) {
-      TensorBuffer buffer = _outputTensorBuffers[i]!;
-      print("${_outputTensorNames[i]}: ${buffer.getDoubleList()}");
+      for (int i = 0; i < _outputTensorBuffers.length; i++) {
+        TensorBuffer buffer = _outputTensorBuffers[i]!;
+        for (int j = 0; j < buffer.getDoubleList().length; j++) {
+          TfResult r = TfResult();
+          r.label = _labels[j];
+          r.score = buffer.getDoubleList()[j];
+          res.add(r);
+        }
+      }
+    } on Exception catch (e) {
+      print('-- detect catch='+e.toString());
     }
-
-    print('-- detect3');
-    return [];
+    res.sort((b,a) => a.score.compareTo(b.score));
+    return res;
   }
 
   /// square
   TensorImage getProcessedImage(TensorImage inputImage) {
-    final padSize = 1280;
+    final padSize = 1080;
     imageProcessor ??= ImageProcessorBuilder()
       // crop
       .add(ResizeWithCropOrPadOp(padSize, padSize))
       // resize
-      .add(ResizeOp(inputSize, inputSize, ResizeMethod.BILINEAR),
+      .add(ResizeOp(_inputSize, _inputSize, ResizeMethod.BILINEAR),
     ).build();
     return imageProcessor!.process(inputImage);
   }
 }
 
 /// TensorFlow Lite Result
-class TfliteResult {
-  TfliteResult(this.id, this.label, this.score, this.location);
-
-  int id;
-  String label;
-  double score; // 0-1
-  Rect location;
-
-  Rect getRenderLocation(Size actualPreviewSize, double pixelRatio) {
-    final ratioX = pixelRatio;
-    final ratioY = ratioX;
-
-    final transLeft = max(0.1, location.left * ratioX);
-    final transTop = max(0.1, location.top * ratioY);
-    final transWidth = min(
-      location.width * ratioX,
-      actualPreviewSize.width,
-    );
-    final transHeight = min(
-      location.height * ratioY,
-      actualPreviewSize.height,
-    );
-    final transformedRect =
-    Rect.fromLTWH(transLeft, transTop, transWidth, transHeight);
-    return transformedRect;
-  }
+class TfResult {
+  String label = "";
+  double score = 0.0;
+}
+class TfResults {
+  List<TfResult> outputs = [];
 }
