@@ -12,7 +12,6 @@ String Size2Str(Size s) {
 }
 
 class CameraScreen extends StatefulWidget {
-  //CameraScreen({Key? key}) : super(key: key);
   CameraScreen();
   @override
   CameraScreenState createState() => CameraScreenState();
@@ -21,10 +20,12 @@ class CameraScreen extends StatefulWidget {
 class CameraScreenState extends State<CameraScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ResolutionPreset _resolutionPreset = ResolutionPreset.high;
-  final ICON_RADIUS=30.0;
-  final ICON_SIZE=40.0;
-  final Color COLOR1 = Color.fromARGB(255, 0xCC, 0x99, 0xFF);
+  final ICON_SIZE=32.0;
+  final ICON_RADIUS=24.0;
+  final ICON_SPACE=50.0;
 
+  final Color COLOR1 = Color.fromARGB(255, 0xCC, 0x99, 0xFF);
+  final Color ICON_BACKCOLOR = Colors.black54;
   bool isAndroid = Platform.isAndroid;
 
   bool _loading = false;
@@ -34,7 +35,6 @@ class CameraScreenState extends State<CameraScreen> {
   Size _cameraSize = Size(100.0, 100.0);
   Size _screenSize = Size(100.0, 100.0);
   double _scale = 1.0;
-  double _angle = 1.0;
 
   @override
   void initState() {
@@ -47,9 +47,9 @@ class CameraScreenState extends State<CameraScreen> {
     _cameras = await availableCameras();
     if (_cameras.length > 0) {
       _controller = CameraController(
-          _cameras[0],
-          _resolutionPreset,
-          imageFormatGroup: ImageFormatGroup.yuv420);
+        _cameras[0],
+        _resolutionPreset,
+        imageFormatGroup: ImageFormatGroup.yuv420);
       _controller!.initialize().then((_) {
         if (!mounted)
           return;
@@ -68,7 +68,7 @@ class CameraScreenState extends State<CameraScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF000000),
+      backgroundColor: Color(0xFF006666),
       body: Stack(
         children: <Widget>[
           _cameraWidget(),
@@ -87,13 +87,13 @@ class CameraScreenState extends State<CameraScreen> {
 
           // Detect button
           Positioned(
-            bottom: 30, left: 0, right: 0,
+            bottom: 30-10, left: 0, right: 0,
             child: CircleAvatar(
-              backgroundColor: _loading ? Colors.red : Colors.black54,
-              radius: ICON_RADIUS,
+              backgroundColor: _loading ? Colors.red : ICON_BACKCOLOR,
+              radius: ICON_RADIUS+10,
               child: IconButton(
                 icon: Icon(Icons.play_circle_outline),
-                iconSize: ICON_SIZE,
+                iconSize: ICON_SIZE+20,
                 color: Colors.white,
                 onPressed: () => _detect(),
               ))
@@ -103,64 +103,26 @@ class CameraScreenState extends State<CameraScreen> {
           Positioned(
             bottom: 30, right: 40,
             child: CircleAvatar(
-              backgroundColor: Colors.black54,
+              backgroundColor: ICON_BACKCOLOR,
               radius: ICON_RADIUS,
               child: IconButton(
-                icon: Icon(Icons.flip_camera_ios),
+                icon: Icon(Icons.flip_camera_ios_outlined),
                 iconSize: ICON_SIZE,
                 color: Colors.white,
                 onPressed: () => _onCameraSwitch(),
               ))
           ),
 
-          _typeButton(
-            Icon(Icons.face),
-            VisionType.FACE,
-            top: 30, left: 30+70.0*0,
-          ),
-          _typeButton(
-            Icon(Icons.face_unlock_outlined),
-            VisionType.FACE2,
-            top: 30, left: 30+70.0*1,
-          ),
-          _typeButton(
-            Icon(Icons.font_download_outlined),
-            VisionType.TEXT,
-            top: 30, left: 30+70.0*2,
-          ),
-          _typeButton(
-            Icon(Icons.image),
-            VisionType.IMAGE,
-            top: 30, left: 30+70.0*3,
-          ),
-          _typeButton(
-            Icon(Icons.qr_code),
-            VisionType.BARCODE,
-            top: 30, left: 30+70.0*4,
-          ),
+          _typeButton(0, VisionType.FACE, Icons.face),
+          _typeButton(1, VisionType.FACE2, Icons.face_unlock_outlined),
+          _typeButton(2, VisionType.TEXT, Icons.font_download_outlined),
+          _typeButton(3, VisionType.IMAGE, Icons.image_outlined),
+          _typeButton(4, VisionType.BARCODE, Icons.qr_code),
+          _typeButton(5, VisionType.POSE, Icons.accessibility),
+          _typeButton(6, VisionType.TENSOR, Icons.star_border),
+          //_typeButton(7, VisionType.INK, Icons.clear),
+          //_typeButton(8, VisionType.OBJECT, Icons.clear),
 
-          _typeButton(
-            Icon(Icons.arrow_upward),
-            VisionType.TENSOR,
-            top: 30.0+70, left: 30+70.0*0,
-          ),
-          _typeButton(
-            Icon(Icons.accessibility),
-            VisionType.POSE,
-            top: 30.0+70, left: 30+70.0*1,
-          ),
-          /*
-          _typeButton(
-            Icon(Icons.clear),
-            VisionType.INK,
-            top: 30.0+70, left: 30+70.0*2,
-          ),   
-          _typeButton(
-            Icon(Icons.clear),
-            VisionType.OBJECT,
-            top: 30.0+70, left: 30+70.0*3,
-          ),
-          */
       ]),
     );
   }
@@ -173,41 +135,26 @@ class CameraScreenState extends State<CameraScreen> {
     _screenSize = MediaQuery.of(context).size;
     _cameraSize = _controller!.value.previewSize!;
 
-    _scale = 1.0;
-    if(_screenSize.width>_screenSize.height)
-      _scale = _screenSize.width/_screenSize.height;
-
-    if(_screenSize.width>_screenSize.height)
-      _scale*=_screenSize.height/_screenSize.width*16/9;
-    else
-      _scale*=_screenSize.width/_screenSize.height*16/9;
-
-    double _camera_scale = 1.0;
-    if(_screenSize.width>_screenSize.height)
-      _camera_scale = _screenSize.height/_screenSize.width*16/9;
-    else
-      _camera_scale = _screenSize.width/_screenSize.height*16/9;
-
-    double aspectRatio = 1.0;
-    if(_screenSize.width>_screenSize.height)
-      aspectRatio = _controller!.value.aspectRatio;
-    else
-      aspectRatio = 1/_controller!.value.aspectRatio;
+    double sw = _screenSize.width;
+    double sh = _screenSize.height;
+    _scale = sw>sh ? 16.0/9.0 : sw/sh*16.0/9.0;
+    double cameraScale = sw>sh ? sh/sw*16.0/9.0 : sw/sh*16.0/9.0;
+    double aspectRatio = sw>sh ? _controller!.value.aspectRatio : 1/_controller!.value.aspectRatio;
 
     if(isTest) {
       // portrait
       _scale = 1.1;
+      cameraScale = sh/sw*16.0/9.0;
       aspectRatio = 1/_controller!.value.aspectRatio;
     }
-
     setState(() {});
 
     print('-- screen ' + Size2Str(_screenSize) + ' camera ' + Size2Str(_cameraSize));
-    print('-- aspect ' + _controller!.value.aspectRatio.toString() +" scale="+ _scale.toString());
+    print('-- aspect ' + _controller!.value.aspectRatio.toStringAsFixed(2) +" scale="+ _scale.toString());
 
     return Center(
       child: Transform.scale(
-        scale: _camera_scale,
+        scale: cameraScale,
         child: OrientationCamera(
           child: AspectRatio(
             aspectRatio: aspectRatio,
@@ -234,15 +181,14 @@ class CameraScreenState extends State<CameraScreen> {
   }
 
   /// Button
-  Widget _typeButton(Icon icon, VisionType type, {
-    double? left=null, double? top=null, double? right=null, double? bottom=null}) {
+  Widget _typeButton(int index, VisionType type, IconData icon) {
     return Positioned(
-      left: left, top:top, right:right, bottom:bottom,
+      top: 30.0, left: 20+ICON_SPACE*index,
       child: CircleAvatar(
-        backgroundColor: _vision!.type==type ? COLOR1 : Colors.black45,
+        backgroundColor: _vision!.type==type ? COLOR1 : ICON_BACKCOLOR,
         radius: ICON_RADIUS,
         child: IconButton(
-          icon: icon,
+          icon: Icon(icon),
           iconSize: ICON_SIZE,
           color: Colors.white,
           onPressed:() {
@@ -254,24 +200,18 @@ class CameraScreenState extends State<CameraScreen> {
 
   /// Detect
   _detect() async {
-    setState(() {
-      _loading = true;
-    });
+    setState(() { _loading = true; });
     try {
       if (_controller!.value.isInitialized) {
         // /data/user/0/com.example.fluttervision/cache/CAP3945262564019216844.jpg'
-        // /data/user/0/com.example.fluttervision/cache/CAP2341203750827543862.jpg
         XFile file = await _controller!.takePicture();
-        print('-- path=' + file.path);
         await _vision!.detect(File(file.path));
         _deleteCacheDir();
       }
     } on Exception catch (e) {
       print('-- Exception ' + e.toString());
     }
-    setState(() {
-      _loading = false;
-    });
+    setState(() { _loading = false; });
   }
 
   Future<void> _deleteCacheDir() async {
