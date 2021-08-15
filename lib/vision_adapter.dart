@@ -25,7 +25,7 @@ class VisionAdapter {
   RecognisedText? text = null;
   List<ImageLabel> labels = [];
   List<Barcode> barcodes = [];
-  List<TfliteResult> results = [];
+  List<TfResult> results = [];
   List<Pose> poses = [];
 
   FaceDetector? _faceDetector;
@@ -94,19 +94,6 @@ class VisionAdapter {
           }
           barcodes = await _barcodeScanner!.processImage(inputImage);
 
-        } else if(type==VisionType.TENSOR) {
-          if(_tflite==null){
-            _tflite = TfliteAdapter();
-            await _tflite!.initModel();
-          }
-          results = await _tflite!.detect(imagefile);
-          print('-- _tensor.length=' + results.length.toString());
-          if(results.length>0) {
-            for (TfliteResult res in results) {
-              print('-- label-' + res.label + ' score=' + res.score.toString());
-            }
-          }
-        
         } else if(type==VisionType.POSE) {
           if(_poseDetector==null){
             _poseDetector = GoogleMlKit.vision.poseDetector(
@@ -119,10 +106,22 @@ class VisionAdapter {
         } else if(type==VisionType.INK) {
           if(_digitalInkRecogniser==null){
           }
-        
         } else if(type==VisionType.OBJECT) {
           if(_objectDetector==null){
-          } 
+          }
+        } else if(type==VisionType.TENSOR) {
+          if (_tflite == null) {
+            _tflite = TfliteAdapter();
+            await _tflite!.initModel();
+          }
+          results = await _tflite!.detect(imagefile);
+          if (results.length > 0) {
+            int i = 0;
+            for (TfResult res in results) {
+              print('-- res ' + res.score.toString() + " " + res.label);
+              if (i++ > 5) break;
+            }
+          }
         }
         print('-- END');
       }
@@ -133,7 +132,7 @@ class VisionAdapter {
 }
 
 class VisionPainter extends CustomPainter {
-  final Color COLOR1 = Color.fromARGB(255, 0xCC, 0x99, 0xFF);
+  final Color COLOR1 = Colors.greenAccent;
   VisionAdapter vision;
   Size cameraSize;
   Size screenSize;
@@ -141,34 +140,36 @@ class VisionPainter extends CustomPainter {
 
   bool isLand = false;
   double landx = 0.0;
+  Paint _paint = Paint();
+  late Canvas _canvas;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final Paint p = Paint();
-    p.style = PaintingStyle.stroke;
-    p.color = COLOR1;
-    p.strokeWidth = 2.0;
+  void paint(Canvas canvas, Size size) { 
+    _canvas = canvas;
+    _paint.style = PaintingStyle.stroke;
+    _paint.color = COLOR1;
+    _paint.strokeWidth = 3.0;
 
     isLand = screenSize.width>screenSize.height ? true : false;
     if(isLand){
-      landx = cameraSize.width*(screenSize.height/screenSize.width*16.0/9.0-1.0)/2;
+      landx = cameraSize.width*(screenSize.height/screenSize.width*16.0/9.0-1.0)/2-10;
     } else {
       landx = 0.0;
     }
 
     if(isTest) {
-      canvas.drawRect(Rect.fromLTWH(size.width/2-10, size.height/2-10, 20, 20), p);
-      canvas.scale(screenSize.height / cameraSize.width);
+      _canvas.drawRect(Rect.fromLTWH(size.width/2-10, size.height/2-10, 20, 20), _paint);
+      _canvas.scale(screenSize.height / cameraSize.width);
       double trans = (screenSize.height - cameraSize.height);
-      canvas.translate(-1 * 36, -1 * 67);
-      _test(canvas);
+      _canvas.translate(-1 * 36, -1 * 67);
+      _test(_canvas);
     } else {
       if (isLand) {
-        canvas.scale(screenSize.height / cameraSize.width);
+        _canvas.scale(screenSize.height / cameraSize.width);
         double trans = (cameraSize.width - cameraSize.height) / 2;
-        canvas.translate(-1 * trans, trans);
+        _canvas.translate(-1 * trans, trans);
       } else {
-        canvas.scale(screenSize.height / cameraSize.width);
+        _canvas.scale(screenSize.height / cameraSize.width);
       }
     }
 
@@ -178,40 +179,34 @@ class VisionPainter extends CustomPainter {
     }
 
     if (vision.type == VisionType.FACE) {
-      if (vision.faces == null || vision.faces.length == 0) {
-        //print("-- face zero");
+      if (vision.faces.length == 0) {
         return;
       }
       for (Face f in vision.faces) {
         Rect r = f.boundingBox;
         if (f.smilingProbability != null) {
-          drawText(canvas, Offset(r.left, r.top),
-              (f.smilingProbability! * 100.0).toInt().toString(), 36);
+          drawText(Offset(r.left, r.top), (f.smilingProbability! * 100.0).toInt().toString(), 36);
         }
-        p.strokeWidth = 2.0;
-        canvas.drawRect(r, p);
+        _canvas.drawRect(r, _paint);
 
-        p.color = Colors.red;
-        p.style = PaintingStyle.fill;
-        p.strokeWidth = 4.0;
-        double r1 = 12.0;
-        drawLandmark(canvas, r1, p, f, FaceLandmarkType.leftEye);
-        drawLandmark(canvas, r1, p, f, FaceLandmarkType.rightEye);
+        _paint.style = PaintingStyle.fill;
+        _paint.color = Colors.red;
+        double r1 = 8.0;
+        drawLandmark(r1, f, FaceLandmarkType.leftEye);
+        drawLandmark(r1, f, FaceLandmarkType.rightEye);
 
-        p.color = COLOR1;
-        p.style = PaintingStyle.fill;
-        p.strokeWidth = 1.0;
-        r1 = 8.0;
-        drawLandmark(canvas, r1, p, f, FaceLandmarkType.bottomMouth);
-        drawLandmark(canvas, r1, p, f, FaceLandmarkType.leftMouth);
-        drawLandmark(canvas, r1, p, f, FaceLandmarkType.rightMouth);
+        _paint.color = Colors.orange;
+        drawLandmark(r1, f, FaceLandmarkType.noseBase);
 
-        drawLandmark(canvas, r1, p, f, FaceLandmarkType.leftEar);
-        drawLandmark(canvas, r1, p, f, FaceLandmarkType.rightEar);
-        drawLandmark(canvas, r1, p, f, FaceLandmarkType.leftCheek);
-        drawLandmark(canvas, r1, p, f, FaceLandmarkType.rightCheek);
+        _paint.color = COLOR1;
+        drawLandmark(r1, f, FaceLandmarkType.bottomMouth);
+        drawLandmark(r1, f, FaceLandmarkType.leftMouth);
+        drawLandmark(r1, f, FaceLandmarkType.rightMouth);
 
-        drawLandmark(canvas, r1, p, f, FaceLandmarkType.noseBase);
+        drawLandmark(r1, f, FaceLandmarkType.leftEar);
+        drawLandmark(r1, f, FaceLandmarkType.rightEar);
+        drawLandmark(r1, f, FaceLandmarkType.leftCheek);
+        drawLandmark(r1, f, FaceLandmarkType.rightCheek);
       }
 
     } else if (vision.type == VisionType.FACE2) {
@@ -219,34 +214,31 @@ class VisionPainter extends CustomPainter {
         return;
       }
       for (Face f in vision.faces) {
-        p.color = COLOR1;
-        p.style = PaintingStyle.stroke;
-        p.strokeWidth = 2.0;
-        drawContour(canvas, p, f, FaceContourType.leftEye);
-        drawContour(canvas, p, f, FaceContourType.rightEye);
+        drawContour(f, FaceContourType.leftEye);
+        drawContour(f, FaceContourType.rightEye);
 
-        drawContour(canvas, p, f, FaceContourType.leftEyebrowBottom);
-        drawContour(canvas, p, f, FaceContourType.leftEyebrowTop);
-        drawContour(canvas, p, f, FaceContourType.rightEyebrowBottom);
-        drawContour(canvas, p, f, FaceContourType.leftEyebrowTop);
+        drawContour(f, FaceContourType.leftEyebrowBottom);
+        drawContour(f, FaceContourType.leftEyebrowTop);
+        drawContour(f, FaceContourType.rightEyebrowBottom);
+        drawContour(f, FaceContourType.leftEyebrowTop);
 
-        drawContour(canvas, p, f, FaceContourType.face);
+        drawContour(f, FaceContourType.face);
 
-        drawContour(canvas, p, f, FaceContourType.lowerLipBottom);
-        drawContour(canvas, p, f, FaceContourType.lowerLipTop);
-        drawContour(canvas, p, f, FaceContourType.upperLipBottom);
-        drawContour(canvas, p, f, FaceContourType.upperLipTop);
+        drawContour(f, FaceContourType.lowerLipBottom);
+        drawContour(f, FaceContourType.lowerLipTop);
+        drawContour(f, FaceContourType.upperLipBottom);
+        drawContour(f, FaceContourType.upperLipTop);
 
-        drawContour(canvas, p, f, FaceContourType.noseBottom);
-        drawContour(canvas, p, f, FaceContourType.noseBridge);
+        drawContour(f, FaceContourType.noseBottom);
+        drawContour(f, FaceContourType.noseBridge);
       }
 
     } else if (vision.type == VisionType.TEXT) {
       if (vision.text == null)
         return;
       for (TextBlock b in vision.text!.blocks) {
-        canvas.drawRect(b.rect, p);
-        drawText(canvas, Offset(b.rect.left, b.rect.top), b.text, 36);
+        _canvas.drawRect(b.rect, _paint);
+        drawText(Offset(b.rect.left, b.rect.top), b.text, 36);
       }
 
     } else if (vision.type == VisionType.IMAGE) {
@@ -255,7 +247,7 @@ class VisionPainter extends CustomPainter {
       int i=0;
       for (ImageLabel label in vision.labels) {
         String s = (label.confidence*100.0).toInt().toString() +" "+ label.label;
-        drawText(canvas, Offset(landx+30, 240+42.0*(i++)), s, 36);
+        drawText(Offset(landx+30, 220+42.0*(i++)-landx), s, 36);
       }
 
     } else if (vision.type == VisionType.BARCODE) {
@@ -263,85 +255,107 @@ class VisionPainter extends CustomPainter {
         return;
       int i=0;
       for (Barcode b in vision.barcodes) {
-        canvas.drawRect(b.value.boundingBox!, p);
+        _paint.strokeWidth = 3.0;
+        _canvas.drawRect(b.value.boundingBox!, _paint);
         String s = b.value.displayValue!;
-        drawText(canvas, Offset(landx+30, 240+42.0*(i++)), s, 36);
+        drawText(Offset(landx+30, 220+42.0*(i++)-landx), s, 36);
       }
     
     } else if (vision.type == VisionType.TENSOR) {
       if (vision.results.length == 0)
         return;
       int i=0;
-      for (TfliteResult res in vision.results) {
-        canvas.drawRect(res.location, p);
-        String s = (res.score*100.0).toInt().toString() + " " + res.label;
-        drawText(canvas, Offset(landx+30, 240+42.0*(i++)), s, 36);
+      for (TfResult res in vision.results) {
+        String s = (res.score).toInt().toString() + " " + res.label;
+        drawText(Offset(landx+30, 220+42.0*(i++)-landx), s, 36);
+        if(i>5) break;
       }
 
     } else if (vision.type == VisionType.POSE) {
       if (vision.poses.length == 0)
         return;
-      p.style = PaintingStyle.fill;
-      p.strokeWidth = 1.0;
       vision.poses.forEach((pose) {
+        Map<PoseLandmarkType, PoseLandmark> lms = pose.landmarks;
 
-        p.color = Colors.blue;
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftAnkle);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftKnee);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftHeel);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftHip);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftFootIndex);
+        _paint.color = Colors.blueAccent;
+        drawPoseLandmark(lms, PoseLandmarkType.leftHip);
+        drawPoseLandmark(lms, PoseLandmarkType.leftKnee);
+        drawPoseLandmark(lms, PoseLandmarkType.leftAnkle);
+        drawPoseLandmark(lms, PoseLandmarkType.leftHeel);
+        drawPoseLandmark(lms, PoseLandmarkType.leftFootIndex);
 
-        p.color = Colors.lightBlueAccent;
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftElbow);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftShoulder);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftWrist);
+        drawPoseLine(lms, PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee);
+        drawPoseLine(lms, PoseLandmarkType.leftKnee, PoseLandmarkType.leftAnkle);
+        drawPoseLine(lms, PoseLandmarkType.leftAnkle, PoseLandmarkType.leftHeel);
+        drawPoseLine(lms, PoseLandmarkType.leftHeel, PoseLandmarkType.leftFootIndex);
 
-        p.color = Colors.blueAccent;
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftPinky);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftThumb);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftIndex);
+        drawPoseLandmark(lms, PoseLandmarkType.leftShoulder);
+        drawPoseLandmark(lms, PoseLandmarkType.leftElbow);
+        drawPoseLandmark(lms, PoseLandmarkType.leftWrist);
 
-        p.color = Colors.greenAccent;
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftEar);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftEye);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftEyeInner);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftEyeOuter);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.leftMouth);
+        drawPoseLine(lms, PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow);
+        drawPoseLine(lms, PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist);
 
-        p.color = Colors.red;
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.nose);
+        drawPoseLandmark(lms, PoseLandmarkType.leftThumb);
+        drawPoseLandmark(lms, PoseLandmarkType.leftIndex);
+        drawPoseLandmark(lms, PoseLandmarkType.leftPinky);
 
-        p.color = Colors.red;
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightAnkle);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightKnee);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightHeel);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightHip);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightFootIndex);
+        drawPoseLine(lms, PoseLandmarkType.leftWrist, PoseLandmarkType.leftThumb);
+        drawPoseLine(lms, PoseLandmarkType.leftWrist, PoseLandmarkType.leftIndex);
+        drawPoseLine(lms, PoseLandmarkType.leftWrist, PoseLandmarkType.leftPinky);
 
-        p.color = Colors.orange;
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightElbow);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightShoulder);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightWrist);
+        _paint.color = Colors.greenAccent;
+        drawPoseLandmark(lms, PoseLandmarkType.rightHip);
+        drawPoseLandmark(lms, PoseLandmarkType.rightKnee);
+        drawPoseLandmark(lms, PoseLandmarkType.rightAnkle);
+        drawPoseLandmark(lms, PoseLandmarkType.rightHeel);
+        drawPoseLandmark(lms, PoseLandmarkType.rightFootIndex);
 
-        p.color = Colors.redAccent;
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightPinky);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightThumb);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightIndex);
+        drawPoseLine(lms, PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee);
+        drawPoseLine(lms, PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle);
+        drawPoseLine(lms, PoseLandmarkType.rightAnkle, PoseLandmarkType.rightHeel);
+        drawPoseLine(lms, PoseLandmarkType.rightHeel, PoseLandmarkType.rightFootIndex);
 
-        p.color = Colors.lightGreen;
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightEar);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightEye);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightEyeInner);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightEyeOuter);
-        drawPoseLandmark(canvas, p, pose.landmarks, PoseLandmarkType.rightMouth);
+        drawPoseLandmark(lms, PoseLandmarkType.rightShoulder);
+        drawPoseLandmark(lms, PoseLandmarkType.rightElbow);
+        drawPoseLandmark(lms, PoseLandmarkType.rightWrist);
+
+        drawPoseLine(lms, PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow);
+        drawPoseLine(lms, PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist);
+
+        drawPoseLandmark(lms, PoseLandmarkType.rightThumb);
+        drawPoseLandmark(lms, PoseLandmarkType.rightIndex);
+        drawPoseLandmark(lms, PoseLandmarkType.rightPinky);
+
+        drawPoseLine(lms, PoseLandmarkType.rightWrist, PoseLandmarkType.rightThumb);
+        drawPoseLine(lms, PoseLandmarkType.rightWrist, PoseLandmarkType.rightIndex);
+        drawPoseLine(lms, PoseLandmarkType.rightWrist, PoseLandmarkType.rightPinky);
+
+        _paint.color = Colors.red;
+        //drawPoseLandmark(lms, PoseLandmarkType.leftEar);
+        drawPoseLandmark(lms, PoseLandmarkType.leftEye);
+        //drawPoseLandmark(lms, PoseLandmarkType.leftEyeInner);
+        //drawPoseLandmark(lms, PoseLandmarkType.leftEyeOuter);
+
+        //drawPoseLandmark(lms, PoseLandmarkType.rightEar);
+        drawPoseLandmark(lms, PoseLandmarkType.rightEye);
+        //drawPoseLandmark(lms, PoseLandmarkType.rightEyeInner);
+        //drawPoseLandmark(lms, PoseLandmarkType.rightEyeOuter);
+
+        _paint.color = Colors.orange;
+        drawPoseLandmark(lms, PoseLandmarkType.nose);
+
+        _paint.color = Colors.orange;
+        drawPoseLandmark(lms, PoseLandmarkType.rightMouth);
+        drawPoseLandmark(lms, PoseLandmarkType.leftMouth);
+        drawPoseLine(lms, PoseLandmarkType.rightMouth, PoseLandmarkType.leftMouth);
 
       });        
     }
   }
 
-  /// Draw face Contour
-  drawContour(Canvas canvas, Paint p, Face f, FaceContourType type) {
+  /// Face Contour
+  drawContour(Face f, FaceContourType type) {
     FaceContour? c = f.getContour(type);
     if(c != null) {
       bool moveto = true;
@@ -349,32 +363,41 @@ class VisionPainter extends CustomPainter {
       for (Offset pos in c.positionsList) {
         if(moveto) {
           path.moveTo(pos.dx, pos.dy);
-          moveto=false;
+          moveto = false;
         } else {
           path.lineTo(pos.dx, pos.dy);
         }
       }
-      canvas.drawPath(path, p);
+      _canvas.drawPath(path, _paint);
     }
   }
 
-  /// Draw face landmark
-  drawLandmark(Canvas canvas, double r, Paint p, Face f, FaceLandmarkType type) {
+  /// Face landmark
+  drawLandmark(double r, Face f, FaceLandmarkType type) {
     FaceLandmark? l = f.getLandmark(type);
     if(l != null) {
-      canvas.drawCircle(l.position, r, p);
+      _canvas.drawCircle(l.position, r, _paint);
     }
   }
 
-  drawPoseLandmark(Canvas canvas, Paint p, Map<PoseLandmarkType, PoseLandmark> landmarks, PoseLandmarkType type) {
+  drawPoseLandmark(Map<PoseLandmarkType, PoseLandmark> landmarks, PoseLandmarkType type) {
     PoseLandmark? m = landmarks[type];
     if(m != null) {
-      canvas.drawCircle(Offset(m.x, m.y), 4, p);
+      _paint.style = PaintingStyle.fill;
+      _canvas.drawCircle(Offset(m.x, m.y), 6, _paint);
     }
   }
 
+  drawPoseLine(Map<PoseLandmarkType, PoseLandmark> landmarks, PoseLandmarkType type1, PoseLandmarkType type2) {
+    PoseLandmark? m1 = landmarks[type1];
+    PoseLandmark? m2 = landmarks[type2];
+    if(m1 != null && m2 != null) {
+      _paint.style = PaintingStyle.stroke;
+      _canvas.drawLine(Offset(m1.x, m1.y), Offset(m2.x, m2.y), _paint);
+    }
+  }
   /// Draw text
-  drawText(Canvas canvas, Offset offset, String text, double size) {
+  drawText(Offset offset, String text, double size) {
     TextSpan span = TextSpan(
       text: " "+text+" ",
       style: TextStyle(
@@ -389,7 +412,7 @@ class VisionPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     );
     textPainter.layout();
-    textPainter.paint(canvas, offset);  
+    textPainter.paint(_canvas, offset);  
   }
 
   /// Test
@@ -411,7 +434,7 @@ class VisionPainter extends CustomPainter {
       canvas.drawLine(Offset(720 / 2,0), Offset(ch / 2,cw), p);
       canvas.drawRect(Rect.fromLTWH(1, 1, ch-2.0, cw-2.0), p);
     }
-    drawText(canvas, Offset(100,100), "ABCDEFGHIJKLMN", 60);
+    drawText(Offset(100,100), "ABCDEFGHIJKLMN", 60);
   }
 
   @override
