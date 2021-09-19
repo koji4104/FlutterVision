@@ -22,7 +22,7 @@ enum VisionType {
 }
 
 class VisionAdapter {
-  VisionType type = VisionType.TENSOR2;
+  VisionType type = VisionType.FACE;
 
   List<Face> faces = [];
   RecognisedText? text = null;
