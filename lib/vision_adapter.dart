@@ -3,6 +3,8 @@ import 'package:google_ml_kit/google_ml_kit.dart';
 import 'package:flutter/material.dart';
 import "dart:async";
 import "package:fluttervision/tflite_adapter.dart";
+import "package:image/image.dart" as imglib;
+import 'package:path_provider/path_provider.dart';
 
 bool isTest = false;
 
@@ -13,13 +15,14 @@ enum VisionType {
   IMAGE,
   BARCODE,
   TENSOR,
+  TENSOR2,
   POSE,
   INK,
   OBJECT,
 }
 
 class VisionAdapter {
-  VisionType type = VisionType.FACE;
+  VisionType type = VisionType.TENSOR2;
 
   List<Face> faces = [];
   RecognisedText? text = null;
@@ -33,7 +36,6 @@ class VisionAdapter {
   ImageLabeler? _imageLabeler;
   BarcodeScanner? _barcodeScanner;
   TfliteAdapter? _tflite;
-
   PoseDetector? _poseDetector;
   DigitalInkRecogniser? _digitalInkRecogniser;
   ObjectDetector? _objectDetector;
@@ -41,6 +43,35 @@ class VisionAdapter {
   RemoteModelManager? _remoteModelManager;
 
   VisionAdapter(){
+    if(_faceDetector==null){
+      _faceDetector = GoogleMlKit.vision.faceDetector(
+        FaceDetectorOptions(
+          enableClassification: true,
+          enableLandmarks: true,
+          enableContours: true,
+          enableTracking: false)
+      );
+    }
+    if(_textDetector==null){
+      _textDetector = GoogleMlKit.vision.textDetector();
+    }
+    if(_imageLabeler==null){
+      _imageLabeler = GoogleMlKit.vision.imageLabeler(
+          ImageLabelerOptions(confidenceThreshold: 0.5)
+      );
+    }
+    if(_barcodeScanner==null){
+      _barcodeScanner = GoogleMlKit.vision.barcodeScanner();
+    }
+    if(_poseDetector==null){
+      _poseDetector = GoogleMlKit.vision.poseDetector(
+        poseDetectorOptions:PoseDetectorOptions(
+          model: PoseDetectionModel.base, mode: PoseDetectionMode.singleImage)
+      );
+    }
+    if (_tflite == null) {
+      _tflite = TfliteAdapter();
+    }
   }
 
   void dispose() {
@@ -48,7 +79,6 @@ class VisionAdapter {
     if (_textDetector != null) _textDetector!.close();
     if (_imageLabeler != null) _imageLabeler!.close();
     if (_barcodeScanner != null) _barcodeScanner!.close();
-
     if (_poseDetector != null) _poseDetector!.close();
     if (_digitalInkRecogniser != null) _digitalInkRecogniser!.close();
     if (_objectDetector != null) _objectDetector!.close();
@@ -63,64 +93,50 @@ class VisionAdapter {
         final inputImage = InputImage.fromFile(imagefile);
 
         if(type==VisionType.FACE || type==VisionType.FACE2) {
-          if(_faceDetector==null){
-            _faceDetector = GoogleMlKit.vision.faceDetector(
-              FaceDetectorOptions(
-                enableClassification: true,
-                enableLandmarks: true,
-                enableContours: true,
-                enableTracking: false)
-            );
-          }
           faces = await _faceDetector!.processImage(inputImage);
 
         } else if(type==VisionType.TEXT) {
-          if(_textDetector==null){
-            _textDetector = GoogleMlKit.vision.textDetector();
-          }
           text = await _textDetector!.processImage(inputImage);
         
         } else if(type==VisionType.IMAGE) {
-          if(_imageLabeler==null){
-            _imageLabeler = GoogleMlKit.vision.imageLabeler(
-              ImageLabelerOptions(confidenceThreshold: 0.5)
-            );
-          }
           labels = await _imageLabeler!.processImage(inputImage);
 
         } else if(type==VisionType.BARCODE) {
-          if(_barcodeScanner==null){
-            _barcodeScanner = GoogleMlKit.vision.barcodeScanner();
-          }
           barcodes = await _barcodeScanner!.processImage(inputImage);
 
         } else if(type==VisionType.POSE) {
-          if(_poseDetector==null){
-            _poseDetector = GoogleMlKit.vision.poseDetector(
-              poseDetectorOptions:PoseDetectorOptions(
-                model: PoseDetectionModel.base, mode: PoseDetectionMode.singleImage)
-            );
-          }
           poses = await _poseDetector!.processImage(inputImage);
 
         } else if(type==VisionType.INK) {
-          if(_digitalInkRecogniser==null){
-          }
+
         } else if(type==VisionType.OBJECT) {
-          if(_objectDetector==null){
-          }
+
         } else if(type==VisionType.TENSOR) {
-          if (_tflite == null) {
-            _tflite = TfliteAdapter();
-            await _tflite!.initModel();
+          results.clear();
+          TfResult res = await _tflite!.detect(imagefile);
+          results.add(res);
+
+        } else if(type==VisionType.TENSOR2) {
+          List<Rect> rects = [];
+          faces = await _faceDetector!.processImage(inputImage);
+          for (Face f in faces) {
+            rects.add(f.boundingBox);
           }
-          results = await _tflite!.detect(imagefile);
-          if (results.length > 0) {
-            int i = 0;
-            for (TfResult res in results) {
-              print('-- res ' + res.score.toString() + " " + res.label);
-              if (i++ > 5) break;
-            }
+          print('-- face='+faces.length.toString());
+
+          results.clear();
+          final File cropfile = File('${(await getTemporaryDirectory()).path}/crop.jpg');
+          final byteData = imagefile.readAsBytesSync();
+          imglib.Image? srcimg = imglib.decodeImage(byteData);
+
+          for (Rect r1 in rects) {
+            r1 = r1.inflate(4.0);
+            imglib.Image crop = imglib.copyCrop(srcimg!, r1.left.toInt(), r1.top.toInt(), r1.width.toInt(), r1.height.toInt());
+            await cropfile.writeAsBytes(imglib.encodeJpg(crop));
+            TfResult res = await _tflite!.detect(cropfile);
+            res.rect = r1;
+            if(res.outputs.length>0)
+              results.add(res);
           }
         }
         print('-- END');
@@ -138,39 +154,55 @@ class VisionPainter extends CustomPainter {
   Size screenSize;
   VisionPainter(this.vision, this.cameraSize, this.screenSize);
 
-  bool isLand = false;
   double landx = 0.0;
   Paint _paint = Paint();
   late Canvas _canvas;
+  double _textTop = 240.0;
+  double _textLeft = 30.0;
+
+  double _fontSize = 32;
+  double _fontHeight = 38;
+  double _pad = 30;
 
   @override
   void paint(Canvas canvas, Size size) { 
     _canvas = canvas;
     _paint.style = PaintingStyle.stroke;
     _paint.color = COLOR1;
-    _paint.strokeWidth = 3.0;
+    _paint.strokeWidth = 2.0;
 
-    isLand = screenSize.width>screenSize.height ? true : false;
-    if(isLand){
-      landx = cameraSize.width*(screenSize.height/screenSize.width*16.0/9.0-1.0)/2-10;
+    double sw = screenSize.width;
+    double sh = screenSize.height;
+    double dw = sw>sh ? sw : sh;
+    double dh = sw>sh ? sh : sw;
+
+    if(isTest)
+      drawRect(Rect.fromLTWH(size.width/2-10, size.height/2-10, 20, 20));
+
+    // 16:10 (Up-down black) or 17:9 (Left-right black)
+    double scale = dw/dh < 16.0/9.0 ? dw / cameraSize.width : dh / cameraSize.height;
+    _canvas.scale(scale);
+
+    if(size.width>size.height && dw/dh < 16.0/9.0){
+      landx = (screenSize.height - size.height);
+    } else if(sw<sh && dw/dh > 16.0/9.0) {
+      landx = (screenSize.height - size.height)/2;
+    }
+
+    //landx = 0;
+    if(size.width>size.height){
+      _textTop = 200;
+      _textLeft = 40;
     } else {
-      landx = 0.0;
+      _textTop = 300;
+      _textLeft = 80;
     }
 
     if(isTest) {
-      _canvas.drawRect(Rect.fromLTWH(size.width/2-10, size.height/2-10, 20, 20), _paint);
-      _canvas.scale(screenSize.height / cameraSize.width);
-      double trans = (screenSize.height - cameraSize.height);
-      _canvas.translate(-1 * 36, -1 * 67);
+      print('-- canvas size=${size.width.toInt()}x${size.height.toInt()}'
+          ' screen ${screenSize.width.toInt()}x${screenSize.height.toInt()}'
+          ' scale ${scale.toStringAsFixed(2)}');
       _test(_canvas);
-    } else {
-      if (isLand) {
-        _canvas.scale(screenSize.height / cameraSize.width);
-        double trans = (cameraSize.width - cameraSize.height) / 2;
-        _canvas.translate(-1 * trans, trans);
-      } else {
-        _canvas.scale(screenSize.height / cameraSize.width);
-      }
     }
 
     if (vision == null) {
@@ -184,36 +216,37 @@ class VisionPainter extends CustomPainter {
       }
       for (Face f in vision.faces) {
         Rect r = f.boundingBox;
+        drawRect(r);
         if (f.smilingProbability != null) {
           drawText(Offset(r.left, r.top), (f.smilingProbability! * 100.0).toInt().toString(), 36);
         }
-        _canvas.drawRect(r, _paint);
 
-        _paint.style = PaintingStyle.fill;
         _paint.color = Colors.red;
-        double r1 = 8.0;
-        drawLandmark(r1, f, FaceLandmarkType.leftEye);
-        drawLandmark(r1, f, FaceLandmarkType.rightEye);
+        drawLandmark(f, FaceLandmarkType.leftEye);
+        drawLandmark(f, FaceLandmarkType.rightEye);
 
         _paint.color = Colors.orange;
-        drawLandmark(r1, f, FaceLandmarkType.noseBase);
+        drawLandmark(f, FaceLandmarkType.noseBase);
 
         _paint.color = COLOR1;
-        drawLandmark(r1, f, FaceLandmarkType.bottomMouth);
-        drawLandmark(r1, f, FaceLandmarkType.leftMouth);
-        drawLandmark(r1, f, FaceLandmarkType.rightMouth);
+        drawLandmark(f, FaceLandmarkType.bottomMouth);
+        drawLandmark(f, FaceLandmarkType.leftMouth);
+        drawLandmark(f, FaceLandmarkType.rightMouth);
 
-        drawLandmark(r1, f, FaceLandmarkType.leftEar);
-        drawLandmark(r1, f, FaceLandmarkType.rightEar);
-        drawLandmark(r1, f, FaceLandmarkType.leftCheek);
-        drawLandmark(r1, f, FaceLandmarkType.rightCheek);
+        drawLandmark(f, FaceLandmarkType.leftEar);
+        drawLandmark(f, FaceLandmarkType.rightEar);
+        drawLandmark(f, FaceLandmarkType.leftCheek);
+        drawLandmark(f, FaceLandmarkType.rightCheek);
       }
 
     } else if (vision.type == VisionType.FACE2) {
-      if (vision.faces == null || vision.faces.length == 0) {
+      if (vision.faces.length == 0) {
         return;
       }
       for (Face f in vision.faces) {
+        Rect r = f.boundingBox;
+        drawRect(r);
+
         drawContour(f, FaceContourType.leftEye);
         drawContour(f, FaceContourType.rightEye);
 
@@ -237,8 +270,8 @@ class VisionPainter extends CustomPainter {
       if (vision.text == null)
         return;
       for (TextBlock b in vision.text!.blocks) {
-        _canvas.drawRect(b.rect, _paint);
-        drawText(Offset(b.rect.left, b.rect.top), b.text, 36);
+        drawRect(b.rect);
+        drawText(Offset(b.rect.left, b.rect.top), b.text, _fontSize);
       }
 
     } else if (vision.type == VisionType.IMAGE) {
@@ -247,7 +280,7 @@ class VisionPainter extends CustomPainter {
       int i=0;
       for (ImageLabel label in vision.labels) {
         String s = (label.confidence*100.0).toInt().toString() +" "+ label.label;
-        drawText(Offset(landx+30, 220+42.0*(i++)-landx), s, 36);
+        drawText(Offset(landx+_pad, _textTop+_fontHeight*(i++)), s, _fontSize);
       }
 
     } else if (vision.type == VisionType.BARCODE) {
@@ -256,9 +289,9 @@ class VisionPainter extends CustomPainter {
       int i=0;
       for (Barcode b in vision.barcodes) {
         _paint.strokeWidth = 3.0;
-        _canvas.drawRect(b.value.boundingBox!, _paint);
+        drawRect(b.value.boundingBox!);
         String s = b.value.displayValue!;
-        drawText(Offset(landx+30, 220+42.0*(i++)-landx), s, 36);
+        drawText(Offset(_textLeft, _textTop + _fontHeight * (i++)), s, _fontSize);
       }
     
     } else if (vision.type == VisionType.TENSOR) {
@@ -266,9 +299,20 @@ class VisionPainter extends CustomPainter {
         return;
       int i=0;
       for (TfResult res in vision.results) {
-        String s = (res.score).toInt().toString() + " " + res.label;
-        drawText(Offset(landx+30, 220+42.0*(i++)-landx), s, 36);
-        if(i>5) break;
+        for (TfOutput out in res.outputs) {
+          String s = (out.score).toInt().toString() + " " + out.label;
+          drawText(Offset(_textLeft, _textTop + _fontHeight * (i++)), s, _fontSize);
+          if (i > 5) break;
+        }
+      }
+
+    } else if (vision.type == VisionType.TENSOR2) {
+      if (vision.results.length == 0)
+        return;
+      for (TfResult res in vision.results) {
+        drawRect(res.rect);
+        String s = (res.outputs[0].score).toInt().toString() + " " + res.outputs[0].label;
+        drawText(Offset(res.rect.left, res.rect.top - _fontHeight), s, _fontSize);
       }
 
     } else if (vision.type == VisionType.POSE) {
@@ -354,32 +398,35 @@ class VisionPainter extends CustomPainter {
     }
   }
 
+  /// Rect
+  drawRect(Rect r) {
+    _paint.style = PaintingStyle.stroke;
+    _canvas.drawRect(r, _paint);
+  }
+
   /// Face Contour
   drawContour(Face f, FaceContourType type) {
     FaceContour? c = f.getContour(type);
     if(c != null) {
-      bool moveto = true;
       var path = Path();
-      for (Offset pos in c.positionsList) {
-        if(moveto) {
-          path.moveTo(pos.dx, pos.dy);
-          moveto = false;
-        } else {
-          path.lineTo(pos.dx, pos.dy);
-        }
-      }
+      c.positionsList.asMap().forEach((i, pos) {
+        i==0 ? path.moveTo(pos.dx, pos.dy) : path.lineTo(pos.dx, pos.dy);
+      });
+      _paint.style = PaintingStyle.stroke;
       _canvas.drawPath(path, _paint);
     }
   }
 
   /// Face landmark
-  drawLandmark(double r, Face f, FaceLandmarkType type) {
+  drawLandmark(Face f, FaceLandmarkType type) {
     FaceLandmark? l = f.getLandmark(type);
     if(l != null) {
-      _canvas.drawCircle(l.position, r, _paint);
+      _paint.style = PaintingStyle.fill;
+      _canvas.drawCircle(l.position, 6.0, _paint);
     }
   }
 
+  /// Pose
   drawPoseLandmark(Map<PoseLandmarkType, PoseLandmark> landmarks, PoseLandmarkType type) {
     PoseLandmark? m = landmarks[type];
     if(m != null) {
@@ -388,6 +435,7 @@ class VisionPainter extends CustomPainter {
     }
   }
 
+  /// Pose line (moveTo lineTo)
   drawPoseLine(Map<PoseLandmarkType, PoseLandmark> landmarks, PoseLandmarkType type1, PoseLandmarkType type2) {
     PoseLandmark? m1 = landmarks[type1];
     PoseLandmark? m2 = landmarks[type2];
@@ -396,15 +444,12 @@ class VisionPainter extends CustomPainter {
       _canvas.drawLine(Offset(m1.x, m1.y), Offset(m2.x, m2.y), _paint);
     }
   }
+
   /// Draw text
   drawText(Offset offset, String text, double size) {
     TextSpan span = TextSpan(
       text: " "+text+" ",
-      style: TextStyle(
-        color: COLOR1,
-        backgroundColor: Colors.black54,
-        fontSize: size,
-      ),
+      style: TextStyle(color: COLOR1, backgroundColor: Colors.black54, fontSize: size),
     );
     final textPainter = TextPainter(
       text: span,
@@ -420,21 +465,23 @@ class VisionPainter extends CustomPainter {
     final Paint p = Paint();
     p.style = PaintingStyle.stroke;
     p.color = Colors.green;
-    p.strokeWidth = 2.0;
-    canvas.drawRect(Rect.fromLTWH(1, 1, 100, 100), p);
-
+    p.strokeWidth = 3.0;
+    
     double cw = cameraSize.width;
     double ch = cameraSize.height;
+
+    canvas.drawRect(Rect.fromLTWH(0, 0, 100, 100), p);
+
     if(screenSize.width>screenSize.height){
       canvas.drawLine(Offset(cw / 2, 0), Offset(cw / 2, ch), p);
       canvas.drawLine(Offset(0, ch / 2), Offset(cw, ch / 2), p);
       canvas.drawRect(Rect.fromLTWH(1, 1, cw-2.0, ch-2.0), p);
     } else {
-      canvas.drawLine(Offset(0,cw / 2), Offset(ch,cw / 2), p);
-      canvas.drawLine(Offset(720 / 2,0), Offset(ch / 2,cw), p);
+      canvas.drawLine(Offset(0, cw / 2), Offset(ch, cw / 2), p);
+      canvas.drawLine(Offset(ch / 2, 0), Offset(ch / 2, cw), p);
       canvas.drawRect(Rect.fromLTWH(1, 1, ch-2.0, cw-2.0), p);
     }
-    drawText(Offset(100,100), "ABCDEFGHIJKLMN", 60);
+    drawText(Offset(100,100), "ABCDEFG", 24);
   }
 
   @override

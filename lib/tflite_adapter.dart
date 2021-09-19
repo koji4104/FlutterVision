@@ -4,38 +4,26 @@ import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
 import "dart:async";
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
+import 'dart:ui';
+import 'dart:math';
 
 class TfliteAdapter {
   Interpreter? _interpreter = null;
   List<String> _labels = [];
-  static const double threshold = 0.6;
-  static const int numResults = 10;
-  int _inputSize = 224;
-  ImageProcessor? imageProcessor;
-  List<List<int>> _outputShapes = [];
-  List<TfLiteType> _outputTypes = [];
+  static int _inputSize = 224;
 
   Map<int, ByteBuffer> _outputBuffers = new Map<int, ByteBuffer>();
   Map<int, TensorBuffer> _outputTensorBuffers = new Map<int, TensorBuffer>();
   Map<int, String> _outputTensorNames = new Map<int, String>();
 
-  bool init=false;
+  bool init = false;
 
   TensorflowAdapter(){}
 
   Future initModel() async {
     try {
-      _inputSize = 224;
       _interpreter = await Interpreter.fromAsset('model.tflite');
-
       final outputTensors = _interpreter!.getOutputTensors();
-      _outputShapes = [];
-      _outputTypes = [];
-      for (final tensor in outputTensors) {
-        _outputShapes.add(tensor.shape);
-        _outputTypes.add(tensor.type);
-      }
-
       outputTensors.asMap().forEach((i, tensor) {
         TensorBuffer output = TensorBuffer.createFixedSize(tensor.shape, tensor.type);
         _outputTensorBuffers[i] = output;
@@ -43,27 +31,43 @@ class TfliteAdapter {
         _outputTensorNames[i] = tensor.name;
       });
 
+      print('-- outputTensors length='+outputTensors.length.toString()); //1
+      print('-- outputTensor[0] shape='+outputTensors[0].shape.toString()); //[1, 5]
+      print('-- outputTensor[0] type='+outputTensors[0].type.toString()); //TfLiteType.uint8
+      print('-- outputTensor[0] name='+outputTensors[0].name); //Identity
+
       /// load labels
       final labelData = await rootBundle.loadString('assets/labels.txt');
       final labelList = labelData.split('\n');
       _labels = labelList;
 
-      init=true;
+      init = true;
     } on Exception catch (e) {
       print('-- initModel '+e.toString());
     }
   }
 
-  Future<List<TfResult>> detect(File imagefile) async {
-    if (init == false)
-      await new Future.delayed(new Duration(seconds:1));
-    if (init == false)
-      return [];
-
-    List<TfResult> res = [];
+  Future<TfResult> detect(File imagefile) async {
+    if (init == false) {
+      await initModel();
+    }
+    if (init == false) {
+      return TfResult();
+    }
+    TfResult res = TfResult();
     try {
       TensorImage inputImage = TensorImage.fromFile(imagefile);
       inputImage = getProcessedImage(inputImage);
+      res = await run(inputImage);
+    } on Exception catch (e) {
+      print('-- detect catch='+e.toString());
+    }
+    return res;
+  }
+
+  Future<TfResult> run(TensorImage inputImage) async {
+    TfResult res = TfResult();
+    try {
       final inputs = [inputImage.buffer];
 
       // RUN
@@ -72,37 +76,39 @@ class TfliteAdapter {
       for (int i = 0; i < _outputTensorBuffers.length; i++) {
         TensorBuffer buffer = _outputTensorBuffers[i]!;
         for (int j = 0; j < buffer.getDoubleList().length; j++) {
-          TfResult r = TfResult();
-          r.label = _labels[j];
+          TfOutput r = TfOutput();
+          r.label = _labels.length>j ? _labels[j] : '-';
           r.score = buffer.getDoubleList()[j];
-          res.add(r);
+          res.outputs.add(r);
         }
       }
     } on Exception catch (e) {
-      print('-- detect catch='+e.toString());
+      print('-- run Exception='+e.toString());
     }
-    res.sort((b,a) => a.score.compareTo(b.score));
+
+    res.outputs.sort((b,a) => a.score.compareTo(b.score));
+    print('-- '+res.outputs[0].score.toString()+' '+res.outputs[0].label+' '+res.outputs[1].score.toString()+' '+res.outputs[1].label);
     return res;
   }
 
-  /// square
+  /// square image
   TensorImage getProcessedImage(TensorImage inputImage) {
-    final padSize = 1080;
-    imageProcessor ??= ImageProcessorBuilder()
-      // crop
-      .add(ResizeWithCropOrPadOp(padSize, padSize))
-      // resize
-      .add(ResizeOp(_inputSize, _inputSize, ResizeMethod.BILINEAR),
+    print('-- TensorImage '+inputImage.width.toString() +' '+ inputImage.height.toString());
+    int cropSize = min(inputImage.height, inputImage.width);
+    ImageProcessor? imageProcessor = ImageProcessorBuilder()
+      .add(ResizeWithCropOrPadOp(cropSize, cropSize)) // Center crop
+      .add(ResizeOp(_inputSize, _inputSize, ResizeMethod.BILINEAR), // Resize 224x224
     ).build();
-    return imageProcessor!.process(inputImage);
+    return imageProcessor.process(inputImage);
   }
 }
 
-/// TensorFlow Lite Result
-class TfResult {
-  String label = "";
+/// TensorFlow Result
+class TfOutput {
   double score = 0.0;
+  String label = "";
 }
-class TfResults {
-  List<TfResult> outputs = [];
+class TfResult {
+  List<TfOutput> outputs = [];
+  Rect rect = Rect.fromLTWH(0,0,0,0);
 }
