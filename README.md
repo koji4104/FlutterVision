@@ -6,19 +6,19 @@ This app uses Flutter and Google ML Kit and TensorFlow Lite.
 ## :blue_book: Screen
 
 ### Face Detector
-<img src='img/10.jpg' width=45%><img src='img/11.jpg' width=45%>
+<img src='img/10.jpg' width=40%><img src='img/11.jpg' width=40%>
 
 ### Text Recognizer
-<img src='img/20.jpg' width=45%> <img src='img/21.jpg' width=45%>
+<img src='img/20.jpg' width=40%> <img src='img/21.jpg' width=40%>
 
 ### Image Labeler
-<img src='img/30.jpg' width=45%> <img src='img/31.jpg' width=45%>
+<img src='img/30.jpg' width=40%> <img src='img/31.jpg' width=40%>
 
 ### Barcode Detector
-<img src='img/40.jpg' width=45%>
+<img src='img/40.jpg' width=40%>
 
 ### Pose Detector
-<img src='img/50.jpg' width=25%> <img src='img/51.jpg' width=25%> <img src='img/52.jpg' width=25%>
+<img src='img/50.jpg' width=20%> <img src='img/51.jpg' width=20%> <img src='img/52.jpg' width=20%>
 
 ### TensorFlow Lite (Custom model)
 
@@ -32,22 +32,22 @@ google-services.json (android)
 GoogleService-Info.plist (ios)
 
 ### 3 Add file to project
-FlutterVision (project)
-:file_folder:android
-&emsp;:file_folder:gradle
-&emsp;:open_file_folder:app
-&emsp;&emsp;:file_folder:build
-&emsp;&emsp;:file_folder:src
-&emsp;&emsp;:notebook:build.gradle
-&emsp;&emsp;:notebook:google-service.json :arrow_left:
-:file_folder:ios
-&emsp;:file_folder:Flutter
-&emsp;:file_folder:Runner
-&emsp;&emsp;:file_folder:Assets.xcaseets
-&emsp;&emsp;:file_folder:Base.lpoj
-&emsp;&emsp;:notebook:AppDelegate.swift
-&emsp;&emsp;:notebook:GoogleService-Info.plist :arrow_left:
-&emsp;&emsp;:notebook:Info.plist
+FlutterVision (project)  
+:file_folder:android  
+&emsp;:file_folder:gradle  
+&emsp;:open_file_folder:app  
+&emsp;&emsp;:file_folder:build  
+&emsp;&emsp;:file_folder:src  
+&emsp;&emsp;:notebook:build.gradle  
+&emsp;&emsp;:notebook:google-service.json :arrow_left:  
+:file_folder:ios  
+&emsp;:file_folder:Flutter  
+&emsp;:file_folder:Runner  
+&emsp;&emsp;:file_folder:Assets.xcaseets  
+&emsp;&emsp;:file_folder:Base.lpoj  
+&emsp;&emsp;:notebook:AppDelegate.swift  
+&emsp;&emsp;:notebook:GoogleService-Info.plist :arrow_left:  
+&emsp;&emsp;:notebook:Info.plist  
 
 ## :blue_book: Creating a model with Tensorflow Lite
 
