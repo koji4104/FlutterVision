@@ -1,11 +1,11 @@
 import 'dart:io';
-import 'package:tflite_flutter/tflite_flutter.dart';
-import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
-import "dart:async";
-import 'dart:typed_data';
-import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'dart:math';
+import "dart:async";
+import 'dart:typed_data';
+import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
+import 'package:flutter/services.dart';
 
 class TfliteAdapter {
   Interpreter? _interpreter = null;

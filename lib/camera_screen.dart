@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:fluttervision/vision_adapter.dart';
-import 'package:image_picker/image_picker.dart';
 
 class CameraScreen extends StatefulWidget {
   CameraScreen();
@@ -20,7 +19,6 @@ class CameraScreenState extends State<CameraScreen> {
 
   final Color COLOR1 = Color.fromARGB(255, 0xCC, 0x99, 0xFF);
   final Color ICON_BACKCOLOR = Colors.black54;
-  bool isAndroid = Platform.isAndroid;
 
   File _pictureFile = File("");
   bool _isDispPicture = false;
@@ -201,7 +199,6 @@ class CameraScreenState extends State<CameraScreen> {
     setState(() { _loading = true; });
     try {
       if (_controller!.value.isInitialized) {
-        // /data/user/0/com.example.fluttervision/cache/CAP3945262564019216844.jpg'
         await _deleteCacheDir();
         XFile file = await _controller!.takePicture();
         setState(() { _pictureFile = File(file.path); });
@@ -234,7 +231,7 @@ class CameraScreenState extends State<CameraScreen> {
     );
   }
 
-  /// Button
+  /// myIconButton
   Widget myIconButton({IconData? icon, Color? backgroundColor, Function()? onPressed}) {
     return CircleAvatar(
       backgroundColor: backgroundColor,

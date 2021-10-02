@@ -1,7 +1,7 @@
 import 'dart:io';
+import "dart:async";
 import 'package:google_ml_kit/google_ml_kit.dart';
 import 'package:flutter/material.dart';
-import "dart:async";
 import "package:fluttervision/tflite_adapter.dart";
 import "package:image/image.dart" as imglib;
 import 'package:path_provider/path_provider.dart';
@@ -21,6 +21,7 @@ enum VisionType {
   OBJECT,
 }
 
+/// Google ML Kit Vision APIs
 class VisionAdapter {
   VisionType type = VisionType.FACE;
 
@@ -122,7 +123,6 @@ class VisionAdapter {
           for (Face f in faces) {
             rects.add(f.boundingBox);
           }
-          print('-- face='+faces.length.toString());
 
           results.clear();
           final File cropfile = File('${(await getTemporaryDirectory()).path}/crop.jpg');
@@ -154,15 +154,12 @@ class VisionPainter extends CustomPainter {
   Size screenSize;
   VisionPainter(this.vision, this.cameraSize, this.screenSize);
 
-  double landx = 0.0;
   Paint _paint = Paint();
   late Canvas _canvas;
   double _textTop = 240.0;
   double _textLeft = 30.0;
-
   double _fontSize = 32;
   double _fontHeight = 38;
-  double _pad = 30;
 
   @override
   void paint(Canvas canvas, Size size) { 
@@ -183,13 +180,6 @@ class VisionPainter extends CustomPainter {
     double scale = dw/dh < 16.0/9.0 ? dw / cameraSize.width : dh / cameraSize.height;
     _canvas.scale(scale);
 
-    if(size.width>size.height && dw/dh < 16.0/9.0){
-      landx = (screenSize.height - size.height);
-    } else if(sw<sh && dw/dh > 16.0/9.0) {
-      landx = (screenSize.height - size.height)/2;
-    }
-
-    //landx = 0;
     if(size.width>size.height){
       _textTop = 200;
       _textLeft = 40;
@@ -232,7 +222,6 @@ class VisionPainter extends CustomPainter {
         drawLandmark(f, FaceLandmarkType.bottomMouth);
         drawLandmark(f, FaceLandmarkType.leftMouth);
         drawLandmark(f, FaceLandmarkType.rightMouth);
-
         drawLandmark(f, FaceLandmarkType.leftEar);
         drawLandmark(f, FaceLandmarkType.rightEar);
         drawLandmark(f, FaceLandmarkType.leftCheek);
@@ -249,21 +238,18 @@ class VisionPainter extends CustomPainter {
 
         drawContour(f, FaceContourType.leftEye);
         drawContour(f, FaceContourType.rightEye);
-
         drawContour(f, FaceContourType.leftEyebrowBottom);
         drawContour(f, FaceContourType.leftEyebrowTop);
         drawContour(f, FaceContourType.rightEyebrowBottom);
         drawContour(f, FaceContourType.leftEyebrowTop);
 
-        drawContour(f, FaceContourType.face);
-
         drawContour(f, FaceContourType.lowerLipBottom);
         drawContour(f, FaceContourType.lowerLipTop);
         drawContour(f, FaceContourType.upperLipBottom);
         drawContour(f, FaceContourType.upperLipTop);
-
         drawContour(f, FaceContourType.noseBottom);
         drawContour(f, FaceContourType.noseBridge);
+        drawContour(f, FaceContourType.face);
       }
 
     } else if (vision.type == VisionType.TEXT) {
@@ -280,7 +266,7 @@ class VisionPainter extends CustomPainter {
       int i=0;
       for (ImageLabel label in vision.labels) {
         String s = (label.confidence*100.0).toInt().toString() +" "+ label.label;
-        drawText(Offset(landx+_pad, _textTop+_fontHeight*(i++)), s, _fontSize);
+        drawText(Offset(_textLeft, _textTop + _fontHeight*(i++)), s, _fontSize);
       }
 
     } else if (vision.type == VisionType.BARCODE) {
@@ -388,8 +374,6 @@ class VisionPainter extends CustomPainter {
 
         _paint.color = Colors.orange;
         drawPoseLandmark(lms, PoseLandmarkType.nose);
-
-        _paint.color = Colors.orange;
         drawPoseLandmark(lms, PoseLandmarkType.rightMouth);
         drawPoseLandmark(lms, PoseLandmarkType.leftMouth);
         drawPoseLine(lms, PoseLandmarkType.rightMouth, PoseLandmarkType.leftMouth);
