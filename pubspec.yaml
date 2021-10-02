@@ -14,18 +14,11 @@ dependencies:
   google_ml_kit: ^0.7.0
   tflite_flutter: ^0.9.0
   tflite_flutter_helper: ^0.2.1
-  native_device_orientation: ^1.0.0
-  image_picker: ^0.8.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   mockito: ^4.0.0
-
-flutter_native_splash:
-  # flutter pub run flutter_native_splash:create
-  color: "000000"
-  image: "lib/assets/splash.png"
 
 flutter:
   uses-material-design: true
