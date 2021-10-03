@@ -32,27 +32,23 @@ target 'Runner' do
   use_modular_headers!
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
-  # Old
-  #pod 'Firebase/MLVisionBarcodeModel'
-  #pod 'Firebase/MLVisionFaceModel'
-  #pod 'Firebase/MLVisionLabelModel'
-  #pod 'Firebase/MLVisionTextModel'
-
-  # New
+  # ML Kit
   pod 'GoogleMLKit/BarcodeScanning'
-  pod 'GoogleMLKit/FaceDetection
-  pod 'GoogleMLKit/ImageLabeling
-  pod 'GoogleMLKit/ObjectDetection
-  pod 'GoogleMLKit/TextRecognition
-  pod 'GoogleMLKit/ImageLabelingCustom
+  pod 'GoogleMLKit/FaceDetection'
+  pod 'GoogleMLKit/ImageLabeling'
+  pod 'GoogleMLKit/ObjectDetection'
+  pod 'GoogleMLKit/TextRecognition'
+  pod 'GoogleMLKit/ImageLabelingCustom'
 
-  # unused
+  # ML Kit unused
   #pod 'GoogleMLKit/ImageLabelingCustom' #(model download from Firebase)
   #pod 'GoogleMLKit/LinkFirebase'  #(model download from Firebase)
   #pod 'GoogleMLKit/LanguageID'  # Language
   #pod 'GoogleMLKit/SmartReply'  # Language
   #pod 'GoogleMLKit/Translate'  # Language
 
+  pod 'TensorFlowLite'
+  pod 'TensorFlowLiteC'
 end
 
 post_install do |installer|
@@ -60,8 +56,3 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
   end
 end
-
-# Add
-# add pods for desired Firebase products
-# https://firebase.google.com/docs/ios/setup#available-pods
-
