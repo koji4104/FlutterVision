@@ -11,16 +11,17 @@ class TfliteAdapter {
   Interpreter? _interpreter = null;
   List<String> _labels = [];
   static int _inputSize = 224;
+  bool init = false;
 
   Map<int, ByteBuffer> _outputBuffers = new Map<int, ByteBuffer>();
   Map<int, TensorBuffer> _outputTensorBuffers = new Map<int, TensorBuffer>();
   Map<int, String> _outputTensorNames = new Map<int, String>();
 
-  bool init = false;
-
   TensorflowAdapter(){}
 
-  Future initModel() async {
+  Future<bool> initModel() async {
+    if(init)
+      return true;
     try {
       _interpreter = await Interpreter.fromAsset('model.tflite');
       final outputTensors = _interpreter!.getOutputTensors();
@@ -45,13 +46,11 @@ class TfliteAdapter {
     } on Exception catch (e) {
       print('-- initModel '+e.toString());
     }
+    return init;
   }
 
   Future<TfResult> detect(File imagefile) async {
-    if (init == false) {
-      await initModel();
-    }
-    if (init == false) {
+    if (await initModel() == false) {
       return TfResult();
     }
     TfResult res = TfResult();
@@ -69,9 +68,7 @@ class TfliteAdapter {
     TfResult res = TfResult();
     try {
       final inputs = [inputImage.buffer];
-
-      // RUN
-      _interpreter!.runForMultipleInputs(inputs, _outputBuffers);
+      _interpreter!.runForMultipleInputs(inputs, _outputBuffers); // RUN
 
       for (int i = 0; i < _outputTensorBuffers.length; i++) {
         TensorBuffer buffer = _outputTensorBuffers[i]!;
