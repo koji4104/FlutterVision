@@ -2,15 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:fluttervision/vision_adapter.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class CameraScreen extends StatefulWidget {
-  CameraScreen();
-  @override
-  CameraScreenState createState() => CameraScreenState();
-}
+import 'vision_adapter.dart';
+import 'provider.dart';
 
-class CameraScreenState extends State<CameraScreen> {
+class CameraScreen extends ConsumerWidget {
+  CameraScreen(){}
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ResolutionPreset _resolutionPreset = ResolutionPreset.high; //high=1280x720
   final ICON_SIZE=34.0;
@@ -20,7 +19,7 @@ class CameraScreenState extends State<CameraScreen> {
   final Color COLOR1 = Color.fromARGB(255, 0xCC, 0x99, 0xFF);
   final Color ICON_BACKCOLOR = Colors.black54;
 
-  File _pictureFile = File("");
+  //File _pictureFile = File("");
   bool _isDispPicture = false;
 
   bool _loading = false;
@@ -31,44 +30,52 @@ class CameraScreenState extends State<CameraScreen> {
   Size _screenSize = Size(100.0, 100.0);
   double _scale = 1.0;
   double _aspect = 1.0;
+  bool bInit = false;
 
-  @override
-  void initState() {
-    _initCameraSync();
-    _vision = VisionAdapter();
-    super.initState();
+  void init(BuildContext context, WidgetRef ref) {
+    if(bInit==false) {
+      _vision = VisionAdapter();
+      _initCameraSync(ref);
+      bInit=true;
+    }
   }
 
-  Future<void> _initCameraSync() async {
+  Future<void> _initCameraSync(WidgetRef ref) async {
     _cameras = await availableCameras();
-    if (_cameras.length > 0) {
+    if (_cameras.length > 0){
       _controller = CameraController(
         _cameras[0],
         _resolutionPreset,
         imageFormatGroup: ImageFormatGroup.yuv420);
       _controller!.initialize().then((_) {
-        if (!mounted)
-          return;
-        setState(() {});
+        ref.read(redrawProvider).notifyListeners();
       });
+    } else {
+      print('-- _cameras.length==0');
     }
   }
 
   @override
-  void dispose() {
+  void dispose(){
     if (_controller != null) _controller!.dispose();
     if (_vision != null) _vision!.dispose();
-    super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref){
+    Future.delayed(Duration.zero, () => init(context,ref));
+    _isDispPicture = ref.watch(isDispPictureProvider);
+    File _pictureFile = ref.watch(pictureFileProvider);
+    VisionType type = ref.watch(visionTypeProvider);
+    if(_vision!=null) _vision!.type = type;
+    ref.watch(redrawProvider);
+    _loading = ref.watch(isLoadingProvider);
+
     return Scaffold(
       backgroundColor: Color(0xFF006666),
       body: Stack(
         children: <Widget>[
-          _isDispPicture ? Center(child:null) : _cameraWidget(),
-
+          _isDispPicture ? Center(child:null) : _cameraWidget(context),
           // Disp Picture
           Center(
             child: Transform.scale(
@@ -87,7 +94,7 @@ class CameraScreenState extends State<CameraScreen> {
                 aspectRatio: _aspect,
                 child: CustomPaint(
                   size: _cameraSize,
-                  painter: VisionPainter(_vision!, _cameraSize, _screenSize)
+                  painter: VisionPainter(_vision, _cameraSize, _screenSize)
                 ),),),
           ),
 
@@ -97,7 +104,7 @@ class CameraScreenState extends State<CameraScreen> {
             child: myIconButton(
               icon: Icons.play_circle_outline,
               backgroundColor: _loading ? Colors.red : ICON_BACKCOLOR,
-              onPressed: () => _detect(),
+              onPressed: () => _onDetect(ref),
             ),
           ),
 
@@ -107,7 +114,7 @@ class CameraScreenState extends State<CameraScreen> {
             child: myIconButton(
               icon: Icons.pause_outlined,
               backgroundColor: _isDispPicture ? COLOR1 : ICON_BACKCOLOR,
-              onPressed: () => _onDispPicture(),
+              onPressed: () => _onDispPicture(ref),
             ),
           ),
 
@@ -117,26 +124,27 @@ class CameraScreenState extends State<CameraScreen> {
             child: myIconButton(
               icon: Icons.flip_camera_ios_outlined,
               backgroundColor: ICON_BACKCOLOR,
-              onPressed: () => _onCameraSwitch(),
+              onPressed: () => _onCameraSwitch(ref),
             ),
           ),
 
-          typeButton(0, VisionType.FACE, Icons.face),
-          typeButton(1, VisionType.FACE2, Icons.face_unlock_outlined),
-          typeButton(2, VisionType.TEXT, Icons.font_download_outlined),
-          typeButton(3, VisionType.IMAGE, Icons.image_outlined),
-          typeButton(4, VisionType.BARCODE, Icons.qr_code),
-          typeButton(5, VisionType.POSE, Icons.accessibility),
-          typeButton(6, VisionType.TENSOR, Icons.looks_one_outlined),
-          typeButton(7, VisionType.TENSOR2, Icons.looks_two_outlined),
-          //typeButton(8, VisionType.INK, Icons.clear),
-          //typeButton(9, VisionType.OBJECT, Icons.clear),
+          typeButton(0, VisionType.FACE, Icons.face, ref),
+          typeButton(1, VisionType.FACE2, Icons.face_unlock_outlined, ref),
+          typeButton(2, VisionType.TEXT, Icons.font_download_outlined, ref),
+          typeButton(3, VisionType.TEXT2, Icons.font_download, ref),
+          typeButton(4, VisionType.IMAGE, Icons.image_outlined, ref),
+          typeButton(5, VisionType.BARCODE, Icons.qr_code, ref),
+          typeButton(6, VisionType.POSE, Icons.accessibility, ref),
+          typeButton(7, VisionType.OBJECT, Icons.crop_square, ref),
+          typeButton(8, VisionType.TENSOR, Icons.looks_one_outlined, ref),
+          typeButton(9, VisionType.TENSOR2, Icons.looks_two_outlined, ref),
+          //typeButton(10, VisionType.INK, Icons.clear, ref),
       ]),
     );
   }
 
   /// Camera
-  Widget _cameraWidget() {
+  Widget _cameraWidget(BuildContext context) {
     if (_controller == null)
       return Container();
 
@@ -152,7 +160,6 @@ class CameraScreenState extends State<CameraScreen> {
     // 16:10 (Up-down black) or 17:9 (Left-right black)
     _scale = dw/dh < 16.0/9.0 ? dh/dw * 16.0/9.0 : dw/dh * 9.0/16.0;
 
-    setState(() {});
     print('-- screen=${sw.toInt()}x${sh.toInt()}'
         ' camera=${_cameraSize.width.toInt()}x${_cameraSize.height.toInt()}'
         ' aspect=${_aspect.toStringAsFixed(2)}'
@@ -169,45 +176,47 @@ class CameraScreenState extends State<CameraScreen> {
   }
 
   /// _onCameraSwitch
-  Future<void> _onCameraSwitch() async {
+  Future<void> _onCameraSwitch(WidgetRef ref) async {
     final CameraDescription desc = (_controller!.description == _cameras[0]) ? _cameras[1] : _cameras[0];
-    if (_controller != null) {
+    if(_controller != null){
       await _controller!.dispose();
     }
     _controller = CameraController(desc, _resolutionPreset);
-    _controller!.addListener(() {
-      if (mounted) setState(() {});
+    _controller!.addListener((){
+      ref.read(redrawProvider).notifyListeners();
     });
     try {
       await _controller!.initialize();
     } on CameraException catch (e) {
     }
-    if (mounted) setState(() {});
+    ref.read(redrawProvider).notifyListeners();
   }
 
   /// _onDispPicture()
-  Future<void> _onDispPicture() async {
-    if(_isDispPicture) {
-      setState((){ _isDispPicture = false; });
-    } else if(await _pictureFile.exists()) {
-      setState((){ _isDispPicture = true; });
+  Future<void> _onDispPicture(WidgetRef ref) async {
+    bool isDisp = ref.read(isDispPictureProvider);
+    File file = ref.read(pictureFileProvider);
+    if(isDisp){
+      ref.read(isDispPictureProvider.state).state = false;
+    } else if(await file.exists()) {
+      ref.read(isDispPictureProvider.state).state = true;
     }
   }
 
   /// Detect
-  _detect() async {
-    setState(() { _loading = true; });
+  _onDetect(WidgetRef ref) async {
+    ref.read(isLoadingProvider.state).state = true;
     try {
       if (_controller!.value.isInitialized) {
         await _deleteCacheDir();
         XFile file = await _controller!.takePicture();
-        setState(() { _pictureFile = File(file.path); });
-        await _vision!.detect(_pictureFile);
+        ref.read(pictureFileProvider.state).state = File(file.path);
+        await _vision!.detect(File(file.path));
       }
     } on Exception catch (e) {
       print('-- Exception ' + e.toString());
     }
-    setState(() { _loading = false; });
+    ref.read(isLoadingProvider.state).state = false;
   }
 
   Future<void> _deleteCacheDir() async {
@@ -218,21 +227,24 @@ class CameraScreenState extends State<CameraScreen> {
   }
 
   /// Button
-  Widget typeButton(int index, VisionType type, IconData icon) {
+  Widget typeButton(int index, VisionType type, IconData icon, WidgetRef ref){
     double top = _aspect>1.0 ? 30.0 : index<6 ? 30.0 : 30.0+ICON_SPACE;
     double left = _aspect>1.0 ? 20 + ICON_SPACE*index : 20 + ICON_SPACE*(index%6);
     return Positioned(
       top: top, left: left,
       child: myIconButton(
         icon: icon,
-        backgroundColor: _vision!.type==type ? COLOR1 : ICON_BACKCOLOR,
-        onPressed: () => setState(() { _vision!.type = type; }),
+        backgroundColor: (_vision!=null && _vision!.type==type) ? COLOR1 : ICON_BACKCOLOR,
+        onPressed:(){
+          if(_vision!=null) _vision!.type = type;
+          ref.read(visionTypeProvider.state).state = type;
+        },
       )
     );
   }
 
   /// myIconButton
-  Widget myIconButton({IconData? icon, Color? backgroundColor, Function()? onPressed}) {
+  Widget myIconButton({IconData? icon, Color? backgroundColor, Function()? onPressed}){
     return CircleAvatar(
       backgroundColor: backgroundColor,
       radius: ICON_RADIUS,
