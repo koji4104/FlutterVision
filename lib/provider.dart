@@ -5,10 +5,6 @@ import "vision_adapter.dart";
 
 const isTestMode = false;
 
-final pictureFileProvider = StateProvider<File>((ref) {
-  return File('');
-});
-
 final isDispPictureProvider = StateProvider<bool>((ref) {
   return false;
 });

@@ -19,7 +19,7 @@ class CameraScreen extends ConsumerWidget {
   final Color COLOR1 = Color.fromARGB(255, 0xCC, 0x99, 0xFF);
   final Color ICON_BACKCOLOR = Colors.black54;
 
-  //File _pictureFile = File("");
+  File _pictureFile = File("");
   bool _isDispPicture = false;
 
   bool _loading = false;
@@ -65,9 +65,8 @@ class CameraScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref){
     Future.delayed(Duration.zero, () => init(context,ref));
     _isDispPicture = ref.watch(isDispPictureProvider);
-    File _pictureFile = ref.watch(pictureFileProvider);
-    VisionType type = ref.watch(visionTypeProvider);
-    if(_vision!=null) _vision!.type = type;
+    //VisionType type = ref.watch(visionTypeProvider);
+    if(_vision!=null) _vision!.type = ref.watch(visionTypeProvider);;
     ref.watch(redrawProvider);
     _loading = ref.watch(isLoadingProvider);
 
@@ -75,18 +74,18 @@ class CameraScreen extends ConsumerWidget {
       backgroundColor: Color(0xFF006666),
       body: Stack(
         children: <Widget>[
-          _isDispPicture ? Center(child:null) : _cameraWidget(context),
-          // Disp Picture
-          Center(
-            child: Transform.scale(
-              scale: _scale,
-              child: AspectRatio(
-                aspectRatio: _aspect,
-                child: _isDispPicture ? Image.file(_pictureFile) : null
-                ),),
-          ),
+          // Display picture or camera
+          _isDispPicture ?
+            Center(
+              child: Transform.scale(
+                scale: _scale,
+                child: AspectRatio(
+                  aspectRatio: _aspect,
+                  child: _isDispPicture ? Image.file(_pictureFile) : null
+                ),),)
+            : _cameraWidget(context),
 
-          // Painter(canvas)
+          // Painter (canvas)
           Center(
             child: Transform.scale(
               scale: _scale,
@@ -175,7 +174,7 @@ class CameraScreen extends ConsumerWidget {
     );
   }
 
-  /// _onCameraSwitch
+  /// CameraSwitch
   Future<void> _onCameraSwitch(WidgetRef ref) async {
     final CameraDescription desc = (_controller!.description == _cameras[0]) ? _cameras[1] : _cameras[0];
     if(_controller != null){
@@ -192,26 +191,27 @@ class CameraScreen extends ConsumerWidget {
     ref.read(redrawProvider).notifyListeners();
   }
 
-  /// _onDispPicture()
+  /// Display picture or camera
+  /// Display the picture taken at the time of detection.
   Future<void> _onDispPicture(WidgetRef ref) async {
     bool isDisp = ref.read(isDispPictureProvider);
-    File file = ref.read(pictureFileProvider);
     if(isDisp){
       ref.read(isDispPictureProvider.state).state = false;
-    } else if(await file.exists()) {
+    } else if(await _pictureFile.exists()) {
       ref.read(isDispPictureProvider.state).state = true;
     }
   }
 
   /// Detect
+  /// take a picture and pass the picture to MlKit.
   _onDetect(WidgetRef ref) async {
     ref.read(isLoadingProvider.state).state = true;
     try {
       if (_controller!.value.isInitialized) {
         await _deleteCacheDir();
         XFile file = await _controller!.takePicture();
-        ref.read(pictureFileProvider.state).state = File(file.path);
-        await _vision!.detect(File(file.path));
+        this._pictureFile = File(file.path);
+        await _vision!.detect(_pictureFile);
       }
     } on Exception catch (e) {
       print('-- Exception ' + e.toString());
@@ -219,6 +219,7 @@ class CameraScreen extends ConsumerWidget {
     ref.read(isLoadingProvider.state).state = false;
   }
 
+  /// Delete the garbage data of the picture.
   Future<void> _deleteCacheDir() async {
     final cacheDir = await getTemporaryDirectory();
     if (cacheDir.existsSync()) {

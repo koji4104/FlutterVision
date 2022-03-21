@@ -2,10 +2,10 @@ import 'dart:io';
 import "dart:async";
 import 'package:google_ml_kit/google_ml_kit.dart';
 import 'package:flutter/material.dart';
-import "package:image/image.dart" as imglib;
+import 'package:image/image.dart' as imglib;
 import 'package:path_provider/path_provider.dart';
 
-import "tflite_adapter.dart";
+import 'tflite_adapter.dart';
 
 bool isTest = false;
 enum VisionType {
@@ -29,6 +29,7 @@ class VisionAdapter {
 
   List<Face> faces = [];
   RecognisedText? text = null;
+  RecognisedText? text2 = null;
   List<ImageLabel> labels = [];
   List<Barcode> barcodes = [];
   List<TfResult> results = [];
@@ -113,7 +114,7 @@ class VisionAdapter {
           text = await _textDetector!.processImage(inputImage);
 
         } else if(type==VisionType.TEXT2) {
-          text = await _textDetectorV2!.processImage(inputImage);
+          text2 = await _textDetectorV2!.processImage(inputImage);
         
         } else if(type==VisionType.IMAGE) {
           labels = await _imageLabeler!.processImage(inputImage);
@@ -230,7 +231,13 @@ class VisionPainter extends CustomPainter {
         Rect r = f.boundingBox;
         drawRect(r);
         if (f.smilingProbability != null) {
-          drawText(Offset(r.left, r.top), (f.smilingProbability! * 100.0).toInt().toString(), 36);
+          drawText(Offset(r.left, r.top), 'smil '+(f.smilingProbability! * 100.0).toInt().toString(), _fontSize);
+        }
+        if (f.headEulerAngleY != null) {
+          drawText(Offset(r.left, r.top + _fontHeight), 'Y '+(f.headEulerAngleY! * 100.0).toInt().toString(), _fontSize);
+        }
+        if (f.headEulerAngleZ != null) {
+          drawText(Offset(r.left, r.top + _fontHeight*2), 'Z ' + (f.headEulerAngleZ! * 100.0).toInt().toString(), _fontSize);
         }
 
         _paint.color = Colors.red;
@@ -278,6 +285,14 @@ class VisionPainter extends CustomPainter {
       if (vision!.text == null)
         return;
       for (TextBlock b in vision!.text!.blocks) {
+        drawRect(b.rect);
+        drawText(Offset(b.rect.left, b.rect.top), b.text, _fontSize);
+      }
+
+    } else if (vision!.type == VisionType.TEXT2) {
+      if (vision!.text2 == null)
+        return;
+      for (TextBlock b in vision!.text2!.blocks) {
         drawRect(b.rect);
         drawText(Offset(b.rect.left, b.rect.top), b.text, _fontSize);
       }
@@ -398,13 +413,13 @@ class VisionPainter extends CustomPainter {
         drawPoseLine(lms, PoseLandmarkType.rightWrist, PoseLandmarkType.rightPinky);
 
         _paint.color = Colors.red;
-        //drawPoseLandmark(lms, PoseLandmarkType.leftEar);
         drawPoseLandmark(lms, PoseLandmarkType.leftEye);
+        //drawPoseLandmark(lms, PoseLandmarkType.leftEar);
         //drawPoseLandmark(lms, PoseLandmarkType.leftEyeInner);
         //drawPoseLandmark(lms, PoseLandmarkType.leftEyeOuter);
 
-        //drawPoseLandmark(lms, PoseLandmarkType.rightEar);
         drawPoseLandmark(lms, PoseLandmarkType.rightEye);
+        //drawPoseLandmark(lms, PoseLandmarkType.rightEar);
         //drawPoseLandmark(lms, PoseLandmarkType.rightEyeInner);
         //drawPoseLandmark(lms, PoseLandmarkType.rightEyeOuter);
 

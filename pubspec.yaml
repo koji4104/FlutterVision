@@ -3,7 +3,7 @@ description: fluttervision
 version: 1.0.1
 
 environment:
-  sdk: ">=2.12.0 <3.0.0"
+  sdk: ">=2.14.0 <3.0.0"
 
 dependencies:
   flutter:
@@ -12,9 +12,10 @@ dependencies:
   path_provider: ^2.0.9
   camera: ^0.9.4+14
   google_ml_kit: ^0.7.3
+  hooks_riverpod: ^1.0.3
+  image: ^3.1.3
   tflite_flutter: ^0.9.0
   tflite_flutter_helper: ^0.3.1
-  hooks_riverpod: ^1.0.3
 
 dev_dependencies:
   flutter_test:
