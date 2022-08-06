@@ -7,6 +7,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'vision_adapter.dart';
 import 'provider.dart';
 
+final cameraScreenProvider = ChangeNotifierProvider((ref) => ChangeNotifier());
 class CameraScreen extends ConsumerWidget {
   CameraScreen(){}
 
@@ -48,7 +49,7 @@ class CameraScreen extends ConsumerWidget {
         _resolutionPreset,
         imageFormatGroup: ImageFormatGroup.yuv420);
       _controller!.initialize().then((_) {
-        ref.read(redrawProvider).notifyListeners();
+        ref.read(cameraScreenProvider).notifyListeners();
       });
     } else {
       print('-- _cameras.length==0');
@@ -65,9 +66,8 @@ class CameraScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref){
     Future.delayed(Duration.zero, () => init(context,ref));
     _isDispPicture = ref.watch(isDispPictureProvider);
-    //VisionType type = ref.watch(visionTypeProvider);
     if(_vision!=null) _vision!.type = ref.watch(visionTypeProvider);;
-    ref.watch(redrawProvider);
+    ref.watch(cameraScreenProvider);
     _loading = ref.watch(isLoadingProvider);
 
     return Scaffold(
@@ -82,8 +82,9 @@ class CameraScreen extends ConsumerWidget {
                 child: AspectRatio(
                   aspectRatio: _aspect,
                   child: _isDispPicture ? Image.file(_pictureFile) : null
-                ),),)
-            : _cameraWidget(context),
+                ),
+              ),
+            ) : _cameraWidget(context),
 
           // Painter (canvas)
           Center(
@@ -94,7 +95,9 @@ class CameraScreen extends ConsumerWidget {
                 child: CustomPaint(
                   size: _cameraSize,
                   painter: VisionPainter(_vision, _cameraSize, _screenSize)
-                ),),),
+                ),
+              ),
+            ),
           ),
 
           // Detect button
@@ -130,11 +133,11 @@ class CameraScreen extends ConsumerWidget {
           typeButton(0, VisionType.FACE, Icons.face, ref),
           typeButton(1, VisionType.FACE2, Icons.face_unlock_outlined, ref),
           typeButton(2, VisionType.TEXT, Icons.font_download_outlined, ref),
-          typeButton(3, VisionType.TEXT2, Icons.font_download, ref),
-          typeButton(4, VisionType.IMAGE, Icons.image_outlined, ref),
-          typeButton(5, VisionType.BARCODE, Icons.qr_code, ref),
-          typeButton(6, VisionType.POSE, Icons.accessibility, ref),
-          typeButton(7, VisionType.OBJECT, Icons.crop_square, ref),
+          typeButton(3, VisionType.IMAGE, Icons.image_outlined, ref),
+          typeButton(4, VisionType.BARCODE, Icons.qr_code, ref),
+          typeButton(5, VisionType.POSE, Icons.accessibility, ref),
+          typeButton(6, VisionType.OBJECT, Icons.crop_square, ref),
+          typeButton(7, VisionType.SELFIE, Icons.face, ref),
           typeButton(8, VisionType.TENSOR, Icons.looks_one_outlined, ref),
           typeButton(9, VisionType.TENSOR2, Icons.looks_two_outlined, ref),
           //typeButton(10, VisionType.INK, Icons.clear, ref),
@@ -181,14 +184,12 @@ class CameraScreen extends ConsumerWidget {
       await _controller!.dispose();
     }
     _controller = CameraController(desc, _resolutionPreset);
-    _controller!.addListener((){
-      ref.read(redrawProvider).notifyListeners();
-    });
     try {
-      await _controller!.initialize();
+      _controller!.initialize().then((_) {
+        ref.read(cameraScreenProvider).notifyListeners();
+      });
     } on CameraException catch (e) {
     }
-    ref.read(redrawProvider).notifyListeners();
   }
 
   /// Display picture or camera

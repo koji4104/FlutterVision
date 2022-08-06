@@ -2,7 +2,7 @@
     package="com.example.fluttervision">
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <application
-        android:name="io.flutter.app.FlutterApplication"
+        android:name="${applicationName}"
         android:label="Vision"
         android:icon="@mipmap/ic_launcher">
         <activity

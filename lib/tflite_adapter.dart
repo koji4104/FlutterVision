@@ -3,19 +3,9 @@ import 'dart:ui';
 import 'dart:math';
 import "dart:async";
 import 'dart:typed_data';
-import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
-
-/// TensorFlow Result
-class TfOutput {
-  double score = 0.0;
-  String label = "";
-}
-class TfResult {
-  List<TfOutput> outputs = [];
-  Rect rect = Rect.fromLTWH(0,0,0,0);
-}
+import 'package:flutter/services.dart';
 
 class TfliteAdapter {
   Interpreter? _interpreter = null;
@@ -110,3 +100,12 @@ class TfliteAdapter {
   }
 }
 
+/// TensorFlow Result
+class TfOutput {
+  double score = 0.0;
+  String label = "";
+}
+class TfResult {
+  List<TfOutput> outputs = [];
+  Rect rect = Rect.fromLTWH(0,0,0,0);
+}

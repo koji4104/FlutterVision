@@ -16,8 +16,3 @@ final isLoadingProvider = StateProvider<bool>((ref) {
 final visionTypeProvider = StateProvider<VisionType>((ref) {
   return VisionType.FACE;
 });
-
-final redrawProvider = ChangeNotifierProvider((ref) => redrawNotifier(ref));
-class redrawNotifier extends ChangeNotifier {
-  redrawNotifier(ref){}
-}
