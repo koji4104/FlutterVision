@@ -314,6 +314,10 @@ class VisionPainter extends CustomPainter {
     } else if (vision.type == VisionType.SELFIE) {
       if (vision.mask == null)
         return;
+      Paint p = Paint();
+      p.style = PaintingStyle.stroke;
+      p.color = COLOR1;
+      p.strokeWidth = 3.0;
       final confidences = vision.mask!.confidences;
       int width = vision.mask!.width; // =256
       int height = vision.mask!.height; // =256
@@ -328,7 +332,7 @@ class VisionPainter extends CustomPainter {
         for (int x = 0; x < width; x++) {
           if(confidences[(y * width) + x]<0.5) {
             _paint.style = PaintingStyle.fill;
-            _canvas.drawCircle(Offset(x.toDouble()*dx, y.toDouble()*dy), 1.0, _paint);
+            _canvas.drawCircle(Offset(x.toDouble()*dx, y.toDouble()*dy), 1.0, p);
           }
         }
       }
