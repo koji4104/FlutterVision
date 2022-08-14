@@ -2,23 +2,30 @@
 
 ## :blue_book: Overview
 This app uses Flutter and Google ML Kit and TensorFlow Lite.
+use google_ml_kit 0.12.0 (2022/8) 
 
 ## :blue_book: Screen
 
 ### Face Detector
-<img src='img/10.jpg' width=40%><img src='img/11.jpg' width=40%>
+<img src='img/10.jpg' width=45%><img src='img/11.jpg' width=45%>
 
 ### Text Recognizer
-<img src='img/20.jpg' width=40%> <img src='img/21.jpg' width=40%>
+<img src='img/20.jpg' width=45%> <img src='img/21.jpg' width=45%>
 
 ### Image Labeler
-<img src='img/30.jpg' width=40%> <img src='img/31.jpg' width=40%>
+<img src='img/30.jpg' width=45%> <img src='img/31.jpg' width=45%>
 
 ### Barcode Detector
-<img src='img/40.jpg' width=40%>
+<img src='img/40.jpg' width=45%>
 
 ### Pose Detector
-<img src='img/50.jpg' width=20%> <img src='img/51.jpg' width=20%> <img src='img/52.jpg' width=20%>
+<img src='img/50.jpg' width=25%> <img src='img/51.jpg' width=25%> <img src='img/52.jpg' width=25%>
+
+### Object Detector
+<img src='img/60.jpg' width=45%> 
+
+### Selfie Segmenter
+<img src='img/70.jpg' width=45%> <img src='img/71.jpg' width=45%>
 
 ### TensorFlow Lite (Custom model)
 
@@ -48,6 +55,8 @@ FlutterVision (project)
 &emsp;&emsp;:notebook:AppDelegate.swift  
 &emsp;&emsp;:notebook:GoogleService-Info.plist :arrow_left:  
 &emsp;&emsp;:notebook:Info.plist  
+
+:warning: It doesn't work on ios. This is because TensorFlow cannot be used.
 
 ## :blue_book: Creating a model with Tensorflow Lite
 
